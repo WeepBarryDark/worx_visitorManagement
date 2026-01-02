@@ -1,0 +1,106 @@
+# Uncomment this line to define a global platform for your project
+platform :ios, '13.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks! :linkage => :static
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  # Clean extended attributes from Flutter framework to fix code signing issues
+  system("find #{__dir__}/../build -name 'Flutter' -type f -path '*/Flutter.framework/*' -exec xattr -c {} \\; 2>/dev/null || true")
+  system("xattr -cr #{__dir__}/../build 2>/dev/null || true")
+
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+
+    # Fix for BROTHERSDK - exclude simulator architectures and fix library search paths
+    target.build_configurations.each do |config|
+      # For BROTHERSDK and BRLMPrinterKit_AB which only support device architectures
+      if target.name == 'BROTHERSDK' || target.name == 'BRLMPrinterKit_AB'
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64 x86_64 i386'
+      end
+
+      # Fix library search paths for all targets to find BROTHERSDK
+      if config.build_settings['LIBRARY_SEARCH_PATHS']
+        config.build_settings['LIBRARY_SEARCH_PATHS'] << '"${PODS_ROOT}/BROTHERSDK"'
+        config.build_settings['LIBRARY_SEARCH_PATHS'] << '"${PODS_ROOT}/BROTHERSDK/BROTHERSDK"'
+      else
+        config.build_settings['LIBRARY_SEARCH_PATHS'] = [
+          '$(inherited)',
+          '"${PODS_ROOT}/BROTHERSDK"',
+          '"${PODS_ROOT}/BROTHERSDK/BROTHERSDK"'
+        ]
+      end
+
+      # Ensure valid architectures are set correctly
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+
+      # Fix code signing issues
+      config.build_settings['CODE_SIGN_IDENTITY'] = ''
+      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+    end
+  end
+
+  # Remove duplicate libBROTHERSDK.a from BROTHERSDK target's source files
+  # to prevent "no rule to process file" warning
+  brothersdk_target = installer.pods_project.targets.find { |t| t.name == 'BROTHERSDK' }
+  if brothersdk_target
+    brothersdk_target.source_build_phase.files.each do |file|
+      if file.file_ref && file.file_ref.path && file.file_ref.path.include?('libBROTHERSDK.a')
+        brothersdk_target.source_build_phase.files.delete(file)
+      end
+    end
+  end
+  bitcode_strip_path = `xcrun --find bitcode_strip`.chop!
+
+    def strip_bitcode_from_framework(bitcode_strip_path, framework_relative_path)
+      framework_path = File.join(Dir.pwd, framework_relative_path)
+      command = "#{bitcode_strip_path} #{framework_path} -r -o #{framework_path}"
+      puts "Stripping bitcode: #{command}"
+      system(command)
+    end
+    
+    framework_paths = [
+      "Pods/BRLMPrinterKit_AB/BRLMPrinterKit/BRLMPrinterKit.framework/BRLMPrinterKit",
+    ]
+    
+    framework_paths.each do |framework_relative_path|
+      strip_bitcode_from_framework(bitcode_strip_path, framework_relative_path)
+    end
+    
+    installer.pods_project.targets.each do |target|
+        flutter_additional_ios_build_settings(target)
+      end
+end
