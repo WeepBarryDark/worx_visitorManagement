@@ -30,6 +30,7 @@ class SecureStorageService {
   static const String _keySelectedSite = 'selected_site';
   static const String _keyNotificationPreferences = 'notification_preferences';
   static const String _keyLastPrinter = 'last_printer'; // Store last discovered printer info
+  static const String _keyPaperType = 'printer_paper_type'; // Store selected paper type
 
   // Data fetch failure tracking keys
   static const String _keyFetchFailureSites = 'fetch_failure_sites';
@@ -615,6 +616,42 @@ class SecureStorageService {
       await _storage.delete(key: _keyLastPrinter);
     } catch (e) {
       debugPrint('Error clearing printer info: $e');
+    }
+  }
+
+  // ========== PAPER TYPE STORAGE ==========
+
+  /// Save selected paper type for printing
+  /// Stores the full paper type configuration as JSON
+  static Future<void> savePaperType(String paperTypeJson) async {
+    try {
+      await _storage.write(
+        key: _keyPaperType,
+        value: paperTypeJson,
+      );
+      debugPrint('Paper type saved: $paperTypeJson');
+    } catch (e) {
+      debugPrint('Error saving paper type: $e');
+    }
+  }
+
+  /// Get saved paper type
+  /// Returns paper type JSON string, or null if not set
+  static Future<String?> getPaperType() async {
+    try {
+      return await _storage.read(key: _keyPaperType);
+    } catch (e) {
+      debugPrint('Error reading paper type: $e');
+      return null;
+    }
+  }
+
+  /// Clear saved paper type
+  static Future<void> clearPaperType() async {
+    try {
+      await _storage.delete(key: _keyPaperType);
+    } catch (e) {
+      debugPrint('Error clearing paper type: $e');
     }
   }
 }

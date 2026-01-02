@@ -10,9 +10,29 @@ import 'package:worxvisitorapp/widgets/kiosk_body.dart';
 import 'package:worxvisitorapp/widgets/kiosk_guard.dart';
 import 'package:worxvisitorapp/features/dashboard/controllers/dashboard_controller.dart';
 import 'package:worxvisitorapp/services/secure_storage_service.dart';
+import 'package:worxvisitorapp/services/kiosk_mode_service.dart';
 
-class VisitorDashboard extends StatelessWidget {
+class VisitorDashboard extends StatefulWidget {
   const VisitorDashboard({super.key});
+
+  @override
+  State<VisitorDashboard> createState() => _VisitorDashboardState();
+}
+
+class _VisitorDashboardState extends State<VisitorDashboard> {
+  @override
+  void initState() {
+    super.initState();
+    // Enable wakelock when entering kiosk mode
+    KioskModeService.enableWakelock();
+  }
+
+  @override
+  void dispose() {
+    // Disable wakelock when leaving kiosk mode
+    KioskModeService.disableWakelock();
+    super.dispose();
+  }
 
   Future<void> _handleAdminSignIn(BuildContext context) async {
     final success = await showDialog<bool>(

@@ -30,6 +30,7 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   http: ^1.6.0
   mobile_scanner: ^7.1.4
+  wakelock_plus: ^1.2.8
 
 dev_dependencies:
   flutter_test:

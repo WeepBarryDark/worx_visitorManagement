@@ -201,7 +201,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
       // Use default questions if no custom questions
       final questionsToShow = questions.isNotEmpty
           ? questions
-          : SiteQuestion.defaultQuestions;
+          : await SiteQuestion.getDefaultQuestions();
 
       debugPrint('Questions to show: ${questionsToShow.length}');
       debugPrint('Custom questions: ${questions.isNotEmpty}');
@@ -942,80 +942,148 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
                                     ),
                                   ),
                                 )
-                              else
-                                DropdownButtonFormField<ContactDetail>(
-                                  initialValue: _selectedContactDetail,
-                                  isExpanded: true,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Select person',
-                                    border: OutlineInputBorder(),
-                                    prefixIcon: Icon(Icons.supervisor_account),
-                                  ),
-                                  selectedItemBuilder: (context) =>
-                                      availableSupervisors
-                                          .map(
-                                            (supervisor) => Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                supervisor.name,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          )
-                                          .toList(),
-                                  items: availableSupervisors
-                                      .map(
-                                        (supervisor) => DropdownMenuItem(
-                                          value: supervisor,
-                                          alignment:
-                                              AlignmentDirectional.centerStart,
-                                          child: SizedBox(
-                                            width: double.infinity,
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  supervisor.name,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                if (supervisor.email.isNotEmpty)
-                                                  Text(
-                                                    supervisor.email,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey,
+                              else ...[
+                                // Dropdown-style button to open contact selector
+                                InkWell(
+                                  onTap: () async {
+                                    final selected = await showDialog<ContactDetail>(
+                                      context: context,
+                                      builder: (context) => _ContactSelectorDialog(
+                                        contacts: availableSupervisors,
+                                        currentSelection: _selectedContactDetail,
+                                      ),
+                                    );
+                                    if (selected != null) {
+                                      setState(() {
+                                        _selectedContactDetail = selected;
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 16,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: AppTheme.slate300,
+                                        width: 1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.supervisor_account,
+                                          color: AppTheme.slate600,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: _selectedContactDetail != null
+                                              ? Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      _selectedContactDetail!.name,
+                                                      style: TextStyle(
+                                                        color: AppTheme.slate900,
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
                                                     ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                    if (_selectedContactDetail!.email.isNotEmpty)
+                                                      Text(
+                                                        _selectedContactDetail!.email,
+                                                        style: TextStyle(
+                                                          color: AppTheme.slate600,
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                )
+                                              : Text(
+                                                  'Select person',
+                                                  style: TextStyle(
+                                                    color: AppTheme.slate500,
+                                                    fontSize: 16,
                                                   ),
-                                              ],
-                                            ),
+                                                ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_drop_down,
+                                          color: AppTheme.slate600,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Show success indicator if selected
+                                if (_selectedContactDetail != null) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: AppTheme.successColor,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Person selected',
+                                        style: TextStyle(
+                                          color: AppTheme.successColor,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      TextButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            _selectedContactDetail = null;
+                                          });
+                                        },
+                                        icon: const Icon(Icons.close, size: 14),
+                                        label: const Text('Clear'),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: AppTheme.slate600,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
                                           ),
                                         ),
-                                      )
-                                      .toList(),
-                                  onChanged: (v) => setState(
-                                    () => _selectedContactDetail = v,
+                                      ),
+                                    ],
                                   ),
+                                ],
+                                // Validation message
+                                FormField<ContactDetail>(
+                                  initialValue: _selectedContactDetail,
                                   validator: (v) {
                                     if (availableSupervisors.isEmpty) {
                                       return 'No contacts available';
                                     }
-                                    if (v == null) {
+                                    if (_selectedContactDetail == null) {
                                       return 'Please select who you are visiting';
                                     }
                                     return null;
                                   },
+                                  builder: (formFieldState) {
+                                    return formFieldState.hasError
+                                        ? Padding(
+                                            padding: const EdgeInsets.only(top: 8, left: 12),
+                                            child: Text(
+                                              formFieldState.errorText ?? '',
+                                              style: TextStyle(
+                                                color: AppTheme.dangerColor,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          )
+                                        : const SizedBox.shrink();
+                                  },
                                 ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 20),
@@ -1373,6 +1441,293 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
     );
 
     return KioskGuard(child: scaffold);
+  }
+}
+
+/// Contact Selector Dialog with Search
+class _ContactSelectorDialog extends StatefulWidget {
+  final List<ContactDetail> contacts;
+  final ContactDetail? currentSelection;
+
+  const _ContactSelectorDialog({
+    required this.contacts,
+    this.currentSelection,
+  });
+
+  @override
+  State<_ContactSelectorDialog> createState() => _ContactSelectorDialogState();
+}
+
+class _ContactSelectorDialogState extends State<_ContactSelectorDialog> {
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredContacts = widget.contacts.where((contact) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      return contact.name.toLowerCase().contains(query) ||
+             contact.email.toLowerCase().contains(query);
+    }).toList();
+
+    // Get screen size for responsive design
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = AppBreakpoints.isSmallScreen(screenWidth);
+    final dialogMaxWidth = AppBreakpoints.getDialogMaxWidth(screenWidth);
+    final dialogHeight = AppBreakpoints.getDialogHeight(screenHeight);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: dialogHeight,
+          maxWidth: dialogMaxWidth,
+        ),
+        child: IntrinsicHeight(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.05),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.supervisor_account,
+                    color: AppTheme.primaryBlue,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Select Person Visiting',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.slate900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                    tooltip: 'Close',
+                  ),
+                ],
+              ),
+            ),
+
+            // Search field (first row)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: !isSmallScreen,
+                decoration: InputDecoration(
+                  labelText: 'Search',
+                  hintText: 'Search by name or email...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchCtrl.clear();
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+            ),
+
+            // Results count
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${filteredContacts.length} contact${filteredContacts.length == 1 ? '' : 's'} found',
+                  style: TextStyle(
+                    color: AppTheme.slate600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Contact list
+            Flexible(
+              child: filteredContacts.isEmpty
+                  ? Container(
+                      constraints: BoxConstraints(
+                        minHeight: isSmallScreen ? 150 : 200,
+                        maxHeight: dialogHeight * 0.5,
+                      ),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.search_off,
+                                size: isSmallScreen ? 48 : 64,
+                                color: AppTheme.slate400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No contacts found',
+                                style: TextStyle(
+                                  color: AppTheme.slate700,
+                                  fontSize: isSmallScreen ? 14 : 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Try adjusting your search',
+                                style: TextStyle(
+                                  color: AppTheme.slate600,
+                                  fontSize: isSmallScreen ? 12 : 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      itemCount: filteredContacts.length,
+                      itemBuilder: (context, index) {
+                        final contact = filteredContacts[index];
+                        final isSelected = widget.currentSelection?.id == contact.id;
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          elevation: isSelected ? 2 : 0,
+                          color: isSelected
+                              ? AppTheme.primaryBlue.withValues(alpha: 0.1)
+                              : null,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? AppTheme.primaryBlue
+                                  : AppTheme.slate200,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 12 : 16,
+                              vertical: isSmallScreen ? 4 : 8,
+                            ),
+                            leading: CircleAvatar(
+                              backgroundColor: isSelected
+                                  ? AppTheme.primaryBlue
+                                  : AppTheme.slate400,
+                              radius: isSmallScreen ? 20 : 24,
+                              child: Text(
+                                contact.name.isNotEmpty
+                                    ? contact.name[0].toUpperCase()
+                                    : 'C',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isSmallScreen ? 16 : 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              contact.name,
+                              style: TextStyle(
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.w600,
+                                fontSize: isSmallScreen ? 14 : 16,
+                              ),
+                            ),
+                            subtitle: contact.email.isNotEmpty
+                                ? Text(
+                                    contact.email,
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 11 : 12,
+                                    ),
+                                  )
+                                : null,
+                            trailing: isSelected
+                                ? Icon(
+                                    Icons.check_circle,
+                                    color: AppTheme.successColor,
+                                    size: isSmallScreen ? 20 : 24,
+                                  )
+                                : Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: isSmallScreen ? 14 : 16,
+                                    color: AppTheme.slate400,
+                                  ),
+                            onTap: () => Navigator.pop(context, contact),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+
+            // Footer with cancel button
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.slate50,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('CANCEL'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      ),
+    );
   }
 }
 

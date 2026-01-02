@@ -468,52 +468,7 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
 
     final selectedVisitor = await showDialog<_SignedVisitor>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Visitor to Sign Out'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: visitors.length,
-            itemBuilder: (context, index) {
-              final visitor = visitors[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.blue,
-                    child: Text(
-                      visitor.fullName.isNotEmpty
-                          ? visitor.fullName[0].toUpperCase()
-                          : 'V',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  title: Text(
-                    visitor.fullName.isNotEmpty ? visitor.fullName : 'Unnamed',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('ID: ${visitor.id}'),
-                      if (visitor.email.isNotEmpty)
-                        Text('Email: ${visitor.email}'),
-                    ],
-                  ),
-                  onTap: () => Navigator.pop(context, visitor),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL'),
-          ),
-        ],
-      ),
+      builder: (context) => _SearchableVisitorDialog(visitors: visitors),
     );
 
     if (selectedVisitor != null) {
@@ -749,6 +704,286 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
     );
 
     return KioskGuard(child: scaffold);
+  }
+}
+
+/// Searchable dialog for selecting visitors
+class _SearchableVisitorDialog extends StatefulWidget {
+  final List<_SignedVisitor> visitors;
+
+  const _SearchableVisitorDialog({required this.visitors});
+
+  @override
+  State<_SearchableVisitorDialog> createState() => _SearchableVisitorDialogState();
+}
+
+class _SearchableVisitorDialogState extends State<_SearchableVisitorDialog> {
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredVisitors = widget.visitors.where((visitor) {
+      if (_searchQuery.isEmpty) return true;
+      final query = _searchQuery.toLowerCase();
+      return visitor.fullName.toLowerCase().contains(query) ||
+             visitor.email.toLowerCase().contains(query) ||
+             visitor.id.toLowerCase().contains(query);
+    }).toList();
+
+    // Get screen size for responsive design
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = AppBreakpoints.isSmallScreen(screenWidth);
+    final dialogMaxWidth = AppBreakpoints.getDialogMaxWidth(screenWidth);
+    final dialogHeight = AppBreakpoints.getDialogHeight(screenHeight);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: dialogHeight,
+          maxWidth: dialogMaxWidth,
+        ),
+        child: IntrinsicHeight(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.05),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.person_search,
+                    color: AppTheme.primaryBlue,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Select Visitor to Sign Out',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.slate900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                    tooltip: 'Close',
+                  ),
+                ],
+              ),
+            ),
+
+            // Search field (first row)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: !isSmallScreen,
+                decoration: InputDecoration(
+                  labelText: 'Search visitor',
+                  hintText: 'Search by name, email, or ID...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchCtrl.clear();
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+            ),
+
+            // Results count
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${filteredVisitors.length} visitor${filteredVisitors.length == 1 ? '' : 's'} found',
+                  style: TextStyle(
+                    color: AppTheme.slate600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Visitor list
+            Flexible(
+              child: filteredVisitors.isEmpty
+                  ? Container(
+                      constraints: BoxConstraints(
+                        minHeight: isSmallScreen ? 150 : 200,
+                        maxHeight: dialogHeight * 0.5,
+                      ),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.search_off,
+                                size: isSmallScreen ? 48 : 64,
+                                color: AppTheme.slate400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No visitors found',
+                                style: TextStyle(
+                                  color: AppTheme.slate700,
+                                  fontSize: isSmallScreen ? 14 : 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Try adjusting your search',
+                                style: TextStyle(
+                                  color: AppTheme.slate600,
+                                  fontSize: isSmallScreen ? 12 : 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      itemCount: filteredVisitors.length,
+                      itemBuilder: (context, index) {
+                        final visitor = filteredVisitors[index];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: AppTheme.slate200,
+                              width: 1,
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 12 : 16,
+                              vertical: isSmallScreen ? 8 : 12,
+                            ),
+                            leading: CircleAvatar(
+                              backgroundColor: AppTheme.primaryBlue,
+                              radius: isSmallScreen ? 20 : 24,
+                              child: Text(
+                                visitor.fullName.isNotEmpty
+                                    ? visitor.fullName[0].toUpperCase()
+                                    : 'V',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isSmallScreen ? 16 : 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              visitor.fullName.isNotEmpty
+                                  ? visitor.fullName
+                                  : 'Unnamed',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: isSmallScreen ? 14 : 16,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(
+                                  'ID: ${visitor.id}',
+                                  style: TextStyle(
+                                    fontSize: isSmallScreen ? 11 : 12,
+                                  ),
+                                ),
+                                if (visitor.email.isNotEmpty)
+                                  Text(
+                                    'Email: ${visitor.email}',
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 11 : 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Icon(
+                              Icons.arrow_forward_ios,
+                              size: isSmallScreen ? 14 : 16,
+                              color: AppTheme.slate400,
+                            ),
+                            onTap: () => Navigator.pop(context, visitor),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+
+            // Footer with cancel button
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.slate50,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('CANCEL'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      ),
+    );
   }
 }
 

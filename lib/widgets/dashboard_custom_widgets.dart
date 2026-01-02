@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/constants/app_routes.dart';
 import '../features/dashboard/controllers/dashboard_controller.dart';
+import '../core/models/paper_type.dart';
+import '../services/secure_storage_service.dart';
 
 /// Key-Value pair widget for displaying information rows
 class KeyValue extends StatelessWidget {
@@ -56,11 +59,61 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
   bool _isAddingManualPrinter = false;
   bool _showManualInput = false;
   String? _manualInputError;
+  PaperType _selectedPaperType = PaperType.defaultType;
+  bool _isLoadingPaperType = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedPaperType();
+  }
 
   @override
   void dispose() {
     _ipController.dispose();
     super.dispose();
+  }
+
+  /// Load saved paper type from storage
+  Future<void> _loadSavedPaperType() async {
+    setState(() {
+      _isLoadingPaperType = true;
+    });
+
+    final savedPaperTypeJson = await SecureStorageService.getPaperType();
+    if (savedPaperTypeJson != null) {
+      try {
+        final paperTypeData = jsonDecode(savedPaperTypeJson) as Map<String, dynamic>;
+        final paperType = PaperType.fromJson(paperTypeData);
+        setState(() {
+          _selectedPaperType = paperType;
+        });
+      } catch (e) {
+        debugPrint('Error loading paper type: $e');
+      }
+    }
+
+    setState(() {
+      _isLoadingPaperType = false;
+    });
+  }
+
+  /// Save selected paper type
+  Future<void> _savePaperType(PaperType paperType) async {
+    final paperTypeJson = jsonEncode(paperType.toJson());
+    await SecureStorageService.savePaperType(paperTypeJson);
+    setState(() {
+      _selectedPaperType = paperType;
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Paper type saved: ${paperType.name}'),
+        backgroundColor: AppTheme.successColor,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _addManualPrinter() async {
@@ -371,6 +424,128 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
               title: const Text('Auto-print visitor badges'),
               subtitle: const Text('Print badge when visitor signs in'),
               contentPadding: EdgeInsets.zero,
+            ),
+
+            // Paper Type Selection
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.statusBackgroundColor('info'),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.description,
+                        color: AppTheme.primaryBlue,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Paper Type',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: AppTheme.slate800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Select the type of label paper installed in your printer',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.slate600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_isLoadingPaperType)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    DropdownButtonFormField<PaperType>(
+                      value: _selectedPaperType,
+                      decoration: InputDecoration(
+                        labelText: 'Select Paper Type',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.print),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: PaperType.supportedTypes.map((paperType) {
+                        return DropdownMenuItem<PaperType>(
+                          value: paperType,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                paperType.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                paperType.description,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.slate600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (paperType) {
+                        if (paperType != null) {
+                          _savePaperType(paperType);
+                        }
+                      },
+                    ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppTheme.slate200,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: AppTheme.slate600,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Current: ${_selectedPaperType.dimensions}${_selectedPaperType.isContinuous ? ' (continuous)' : ''}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.slate700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

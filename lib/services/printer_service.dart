@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:another_brother/printer_info.dart' as printer;
 import 'package:worxvisitorapp/services/secure_storage_service.dart';
+import 'package:worxvisitorapp/core/models/paper_type.dart';
 
 /// Network printer data
 class DiscoveredPrinter {
@@ -746,14 +747,33 @@ class PrinterService {
     try {
       final printerInfo = selectedPrinter!.printerInfo!;
 
+      // Get saved paper type or use default
+      int labelNameIndex = 17; // Default: 62mm continuous
+      bool isSpecialTape = false; // Default: Black/White
+
+      final savedPaperTypeJson = await SecureStorageService.getPaperType();
+      if (savedPaperTypeJson != null) {
+        try {
+          final paperTypeData = jsonDecode(savedPaperTypeJson) as Map<String, dynamic>;
+          final paperType = PaperType.fromJson(paperTypeData);
+          labelNameIndex = paperType.labelNameIndex;
+          isSpecialTape = paperType.isSpecialTape;
+          debugPrint('Using saved paper type: ${paperType.name}');
+        } catch (e) {
+          debugPrint('Error parsing paper type, using defaults: $e');
+        }
+      }
+
+      debugPrint('Paper config: labelNameIndex=$labelNameIndex, isSpecialTape=$isSpecialTape (${isSpecialTape ? "Red/Black" : "Black/White"})');
+
       printerInfo.paperSize = printer.PaperSize.CUSTOM;
       printerInfo.orientation = printer.Orientation.PORTRAIT;
       printerInfo.isAutoCut = true;
       printerInfo.isCutAtEnd = true;
       printerInfo.printMode = printer.PrintMode.FIT_TO_PAGE;
       printerInfo.halftone = printer.Halftone.ERRORDIFFUSION;
-      printerInfo.labelNameIndex = 17;
-      printerInfo.isSpecialTape = false;
+      printerInfo.labelNameIndex = labelNameIndex;
+      printerInfo.isSpecialTape = isSpecialTape; // Apply color type
       printerInfo.workPath = '';
 
       final printerInstance = printer.Printer();
