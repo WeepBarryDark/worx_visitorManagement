@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:worxvisitorapp/widgets/kiosk_field.dart';
@@ -20,6 +21,9 @@ import 'package:worxvisitorapp/services/timezone_service.dart';
 import 'package:worxvisitorapp/services/notification_service.dart';
 import 'package:worxvisitorapp/services/contact_loader.dart';
 import 'package:worxvisitorapp/services/site_loader.dart';
+import 'package:worxvisitorapp/core/models/print_status.dart';
+import 'package:worxvisitorapp/widgets/print_progress_widget.dart';
+import 'package:image_picker/image_picker.dart';
 
 class VisitorSignInPage extends StatefulWidget {
   const VisitorSignInPage({super.key});
@@ -58,6 +62,10 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
 
   // Email validation
   String? _emailMatchWarning; // Warning if email matches a contact
+
+  // Visitor photo
+  Uint8List? _visitorPhotoBytes; // Captured visitor photo
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void dispose() {
@@ -132,6 +140,42 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
         lower.endsWith('.jpeg');
   }
 
+  /// Take visitor photo
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        setState(() {
+          _visitorPhotoBytes = bytes;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error taking photo: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to capture photo: $e'),
+            backgroundColor: AppTheme.dangerColor,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Remove visitor photo
+  void _removePhoto() {
+    setState(() {
+      _visitorPhotoBytes = null;
+    });
+  }
+
   Future<void> _onSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -168,6 +212,26 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
             label: 'OK',
             textColor: Colors.white,
             onPressed: () {},
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Check if visitor photo is required but not taken
+    if (c.reqVisitorPhoto && _visitorPhotoBytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Visitor photo is required. Please take a photo before continuing.',
+          ),
+          backgroundColor: AppTheme.warningColor,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Take Photo',
+            textColor: Colors.white,
+            onPressed: _takePhoto,
           ),
         ),
       );
@@ -310,6 +374,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
         siteName: c.resolveSiteHeading('Visitor Badge'),
         clientLogoBytes: c.clientLogoBytes,
         clientLogoUrl: c.clientLogoUrl,
+        visitorPhotoBytes: _visitorPhotoBytes,
       );
       await _sendNotificationsOnSignIn(c, badgeData);
 
@@ -1115,6 +1180,108 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
                             ],
                           ),
                         ],
+
+                        // Visitor Photo Section
+                        if (c?.reqVisitorPhoto ?? false) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.statusBackgroundColor('info'),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.camera_alt,
+                                      color: AppTheme.primaryBlue,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Visitor Photo',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.slate800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                if (_visitorPhotoBytes != null) ...[
+                                  Container(
+                                    height: 200,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: AppTheme.slate300,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Image.memory(
+                                        _visitorPhotoBytes!,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: _takePhoto,
+                                          icon: const Icon(Icons.refresh, size: 20),
+                                          label: const Text('Retake'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: _removePhoto,
+                                          icon: const Icon(Icons.delete, size: 20),
+                                          label: const Text('Remove'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppTheme.dangerColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ] else ...[
+                                  FilledButton.icon(
+                                    onPressed: _takePhoto,
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text('Take Photo'),
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Photo is required to continue',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.slate600,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 20),
                         Row(
                           children: [
                             OutlinedButton.icon(
@@ -1185,7 +1352,7 @@ class _BadgePreviewPage extends StatefulWidget {
 }
 
 class _BadgePreviewPageState extends State<_BadgePreviewPage> {
-  bool _isPrinting = false;
+  PrintProgress _printProgress = PrintProgress.idle();
 
   @override
   void initState() {
@@ -1196,37 +1363,44 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
 
   Future<void> _autoPrintBadge() async {
     if (!widget.controller.printVisitorBadge) {
-      // Printing not enabled, skip
+      // Printing not enabled, user can return immediately
       return;
     }
 
-    setState(() => _isPrinting = true);
-
     final printSuccess = await widget.controller.printerService.printImage(
       widget.badgeImage,
+      onStatusUpdate: (progress) {
+        if (mounted) {
+          setState(() {
+            _printProgress = progress;
+          });
+        }
+      },
     );
 
     if (mounted) {
-      setState(() => _isPrinting = false);
-    }
-
-    if (printSuccess) {
-      Future.delayed(const Duration(seconds: 10), () {
-        _returnToKiosk();
-      });
-      debugPrint('Badge printed successfully!');
-    } else {
-      debugPrint('Badge printing failed');
+      if (printSuccess) {
+        // Auto-return after 5 seconds when print completes
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) _returnToKiosk();
+        });
+        debugPrint('Badge printed successfully!');
+      } else {
+        debugPrint('Badge printing failed');
+      }
     }
   }
 
   void _returnToKiosk() {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      AppRoutes.visitorKiosk,
-      (route) => false,
-      arguments: widget.controller,
-    );
+    // Only allow return if printing is not in progress
+    if (!_printProgress.status.isInProgress || !widget.controller.printVisitorBadge) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.visitorKiosk,
+        (route) => false,
+        arguments: widget.controller,
+      );
+    }
   }
 
   Widget _buildInfoRow(String label, String value) {
@@ -1256,11 +1430,30 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    final scaffold = Scaffold(
-      body: Align(
-        alignment: Alignment.center,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+    final scaffold = PopScope(
+      // Prevent back button during printing
+      canPop: !_printProgress.status.isInProgress || !widget.controller.printVisitorBadge,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+
+        // Show warning if user tries to exit during printing
+        if (_printProgress.status.isInProgress && widget.controller.printVisitorBadge) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Please wait for printing to complete before returning to kiosk',
+              ),
+              backgroundColor: AppTheme.warningColor,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        body: Align(
+          alignment: Alignment.center,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(
               maxWidth: AppBreakpoints.standard,
@@ -1364,13 +1557,27 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Action button: Shows loading while printing, then "Return to Kiosk"
+                    // Print Progress Display (only show if printing is enabled)
+                    if (widget.controller.printVisitorBadge) ...[
+                      PrintProgressWidget(
+                        progress: _printProgress,
+                        showIcon: true,
+                        showTimestamp: false,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Action button: Disabled while printing, enabled when done
                     SizedBox(
                       width: double.infinity,
-                      child: _isPrinting
-                          ? FilledButton.icon(
-                              onPressed: null, // Disabled while printing
-                              icon: const SizedBox(
+                      child: FilledButton.icon(
+                        onPressed: (_printProgress.status.isInProgress &&
+                                widget.controller.printVisitorBadge)
+                            ? null // Disabled while printing
+                            : _returnToKiosk,
+                        icon: (_printProgress.status.isInProgress &&
+                                widget.controller.printVisitorBadge)
+                            ? const SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
@@ -1379,63 +1586,57 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
                                     Colors.white70,
                                   ),
                                 ),
-                              ),
-                              label: const Text('Printing...'),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                              ),
-                            )
-                          : FilledButton.icon(
-                              onPressed: _returnToKiosk,
-                              icon: const Icon(Icons.home),
-                              label: const Text('Return to Kiosk'),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
+                              )
+                            : const Icon(Icons.home),
+                        label: Text(
+                          (_printProgress.status.isInProgress &&
+                                  widget.controller.printVisitorBadge)
+                              ? 'Please wait...'
+                              : 'Return to Kiosk',
+                        ),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
 
-                    // Info message
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.statusBackgroundColor('success'),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: AppTheme.successColor,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              widget.controller.printVisitorBadge
-                                  ? _isPrinting
-                                        ? 'Please wait while your badge is being printed...'
-                                        : 'Your badge has been printed. Please collect it from the printer.'
-                                  : 'Sign-in complete! Click "Return to Kiosk" when ready.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.slate700,
+                    // Info message - only show if printing disabled
+                    if (!widget.controller.printVisitorBadge)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.statusBackgroundColor('success'),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: AppTheme.successColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Sign-in complete! Click "Return to Kiosk" when ready.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.slate700,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -1491,10 +1692,9 @@ class _ContactSelectorDialogState extends State<_ContactSelectorDialog> {
           maxHeight: dialogHeight,
           maxWidth: dialogMaxWidth,
         ),
-        child: IntrinsicHeight(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             // Header
             Container(
               padding: const EdgeInsets.all(20),
@@ -1725,7 +1925,6 @@ class _ContactSelectorDialogState extends State<_ContactSelectorDialog> {
             ),
           ],
         ),
-      ),
       ),
     );
   }

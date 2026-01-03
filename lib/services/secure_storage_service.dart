@@ -31,6 +31,8 @@ class SecureStorageService {
   static const String _keyNotificationPreferences = 'notification_preferences';
   static const String _keyLastPrinter = 'last_printer'; // Store last discovered printer info
   static const String _keyPaperType = 'printer_paper_type'; // Store selected paper type
+  static const String _keyVisitorRequirements = 'visitor_requirements'; // Store required visitor fields
+  static const String _keyPrintSettings = 'print_settings'; // Store print-related settings
 
   // Data fetch failure tracking keys
   static const String _keyFetchFailureSites = 'fetch_failure_sites';
@@ -652,6 +654,78 @@ class SecureStorageService {
       await _storage.delete(key: _keyPaperType);
     } catch (e) {
       debugPrint('Error clearing paper type: $e');
+    }
+  }
+
+  // ========== VISITOR REQUIREMENTS STORAGE ==========
+
+  /// Save visitor field requirements
+  /// Stores which fields are required during visitor sign-in
+  static Future<void> saveVisitorRequirements(String requirementsJson) async {
+    try {
+      await _storage.write(
+        key: _keyVisitorRequirements,
+        value: requirementsJson,
+      );
+      debugPrint('Visitor requirements saved');
+    } catch (e) {
+      debugPrint('Error saving visitor requirements: $e');
+    }
+  }
+
+  /// Get saved visitor field requirements
+  /// Returns requirements JSON string, or null if not set
+  static Future<String?> getVisitorRequirements() async {
+    try {
+      return await _storage.read(key: _keyVisitorRequirements);
+    } catch (e) {
+      debugPrint('Error reading visitor requirements: $e');
+      return null;
+    }
+  }
+
+  /// Clear saved visitor requirements
+  static Future<void> clearVisitorRequirements() async {
+    try {
+      await _storage.delete(key: _keyVisitorRequirements);
+    } catch (e) {
+      debugPrint('Error clearing visitor requirements: $e');
+    }
+  }
+
+  // ========== PRINT SETTINGS STORAGE ==========
+
+  /// Save print-related settings
+  /// Stores settings like automatic badge printing
+  static Future<void> savePrintSettings(String settingsJson) async {
+    try {
+      await _storage.write(
+        key: _keyPrintSettings,
+        value: settingsJson,
+      );
+      debugPrint('Print settings saved');
+    } catch (e) {
+      debugPrint('Error saving print settings: $e');
+    }
+  }
+
+  /// Get saved print settings
+  /// Returns settings JSON string, or null if not set
+  static Future<String?> getPrintSettings() async {
+    try {
+      return await _storage.read(key: _keyPrintSettings);
+    } catch (e) {
+      debugPrint('Error reading print settings: $e');
+      return null;
+    }
+  }
+
+  /// Clear saved print settings
+  static Future<void> clearPrintSettings() async {
+    try {
+      await _storage.delete(key: _keyPrintSettings);
+    } catch (e) {
+      debugPrint('Error clearing print settings: $e');
     }
   }
 }

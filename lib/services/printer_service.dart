@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:another_brother/printer_info.dart' as printer;
 import 'package:worxvisitorapp/services/secure_storage_service.dart';
 import 'package:worxvisitorapp/core/models/paper_type.dart';
+import 'package:worxvisitorapp/core/models/print_status.dart';
 
 /// Network printer data
 class DiscoveredPrinter {
@@ -711,40 +712,55 @@ class PrinterService {
     }
   }
 
-  /// Print image
-  Future<bool> printImage(dynamic image) async {
+  /// Print image with optional status callback
+  Future<bool> printImage(
+    dynamic image, {
+    void Function(PrintProgress)? onStatusUpdate,
+  }) async {
     if (image is! ui.Image) {
       errorMessage = 'Invalid image format';
+      onStatusUpdate?.call(PrintProgress.failed('Invalid image format'));
       return false;
     }
 
     if (selectedPrinter == null) {
       errorMessage = 'No printer selected';
+      onStatusUpdate?.call(PrintProgress.failed('No printer selected'));
       return false;
     }
 
     try {
       if (kIsWeb) {
         //Web printing not implemented'
+        onStatusUpdate?.call(PrintProgress.failed('Web printing not supported'));
         return false;
       } else {
-        return await _printMobile(image);
+        return await _printMobile(image, onStatusUpdate: onStatusUpdate);
       }
     } catch (e) {
       errorMessage = 'Print failed: $e';
       debugPrint('Print error: $e');
+      onStatusUpdate?.call(PrintProgress.failed('Print failed: $e'));
       return false;
     }
   }
 
-  /// Print using Brother SDK
-  Future<bool> _printMobile(ui.Image image) async {
+  /// Print using Brother SDK with status updates
+  Future<bool> _printMobile(
+    ui.Image image, {
+    void Function(PrintProgress)? onStatusUpdate,
+  }) async {
     if (selectedPrinter?.printerInfo == null) {
       errorMessage = 'Printer info not available';
+      onStatusUpdate?.call(PrintProgress.failed('Printer info not available'));
       return false;
     }
 
     try {
+      // Status: Connecting
+      onStatusUpdate?.call(PrintProgress.connecting());
+      await Future.delayed(const Duration(milliseconds: 300));
+
       final printerInfo = selectedPrinter!.printerInfo!;
 
       // Get saved paper type or use default
@@ -766,6 +782,9 @@ class PrinterService {
 
       debugPrint('Paper config: labelNameIndex=$labelNameIndex, isSpecialTape=$isSpecialTape (${isSpecialTape ? "Red/Black" : "Black/White"})');
 
+      // Status: Preparing print job
+      onStatusUpdate?.call(PrintProgress.sending());
+
       printerInfo.paperSize = printer.PaperSize.CUSTOM;
       printerInfo.orientation = printer.Orientation.PORTRAIT;
       printerInfo.isAutoCut = true;
@@ -779,14 +798,26 @@ class PrinterService {
       final printerInstance = printer.Printer();
       printer.Printer.setUserPrinterInfo(printerInfo);
 
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Status: Sending to printer
+      onStatusUpdate?.call(PrintProgress.printing());
+
       final printResult = await printerInstance.printImage(image);
+
       if (printResult.errorCode != printer.ErrorCode.ERROR_NONE) {
         errorMessage = 'Print error: ${printResult.errorCode.getName()}';
+        onStatusUpdate?.call(PrintProgress.failed(errorMessage!));
         return false;
       }
+
+      // Status: Completed
+      onStatusUpdate?.call(PrintProgress.completed());
       return true;
     } catch (e) {
       debugPrint(' Print error: $e');
+      errorMessage = 'Print error: $e';
+      onStatusUpdate?.call(PrintProgress.failed(errorMessage!));
       return false;
     }
   }

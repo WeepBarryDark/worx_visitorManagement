@@ -168,6 +168,25 @@ class _VisitorDashboardState extends State<VisitorDashboard> {
                               ),
                             ),
                           ),
+                          const SizedBox(height: 14),
+
+                          // Contractor Sign In button
+                          FilledButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.contractorSignIn,
+                              arguments: c,
+                            ),
+                            icon: const Icon(Icons.qr_code_2, size: 22),
+                            label: const Text('Contractor Sign In'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 56),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),

@@ -47,6 +47,7 @@ class DashboardController extends ChangeNotifier {
   bool reqAddress = false;
   bool reqSupervisor = false;
   bool reqSignInTime = false;
+  bool reqVisitorPhoto = false; // Require visitor photo during sign-in
 
   // ========== NOTIFICATION SETTINGS ==========
   bool notifyVisitorSms = false;
@@ -83,6 +84,10 @@ class DashboardController extends ChangeNotifier {
     _loadSelectedSite();
     // Load notification preferences from storage
     _loadNotificationPreferences();
+    // Load visitor field requirements from storage
+    _loadVisitorRequirements();
+    // Load print settings from storage
+    _loadPrintSettings();
   }
 
   // ========== SITE SELECTION ==========
@@ -146,37 +151,50 @@ class DashboardController extends ChangeNotifier {
 
   void setReqPhone(bool v) {
     reqPhone = v;
+    _saveVisitorRequirements();
     notifyListeners();
   }
 
   void setReqEmail(bool v) {
     // Email is always required, ignore attempts to disable it
     reqEmail = true;
+    _saveVisitorRequirements();
     notifyListeners();
   }
 
   void setReqWorkType(bool v) {
     reqWorkType = v;
+    _saveVisitorRequirements();
     notifyListeners();
   }
 
   void setReqCompany(bool v) {
     reqCompany = v;
+    _saveVisitorRequirements();
     notifyListeners();
   }
 
   void setReqAddress(bool v) {
     reqAddress = v;
+    _saveVisitorRequirements();
     notifyListeners();
   }
 
   void setReqSupervisor(bool v) {
     reqSupervisor = v;
+    _saveVisitorRequirements();
     notifyListeners();
   }
 
   void setReqSignInTime(bool v) {
     reqSignInTime = v;
+    _saveVisitorRequirements();
+    notifyListeners();
+  }
+
+  void setReqVisitorPhoto(bool v) {
+    reqVisitorPhoto = v;
+    _saveVisitorRequirements();
     notifyListeners();
   }
 
@@ -393,6 +411,7 @@ class DashboardController extends ChangeNotifier {
   /// Enable/disable automatic visitor badge printing
   void setPrintVisitorBadge(bool v) {
     printVisitorBadge = v;
+    _savePrintSettings();
     notifyListeners();
   }
 
@@ -458,6 +477,78 @@ class DashboardController extends ChangeNotifier {
     previewImageBytes = await BadgeGenerator.generateBadgeBytes(badgeData);
     showPreview = true;
     notifyListeners();
+  }
+
+  // ========== VISITOR REQUIREMENTS PERSISTENCE ==========
+
+  /// Load visitor field requirements from secure storage
+  Future<void> _loadVisitorRequirements() async {
+    try {
+      final requirementsJson = await SecureStorageService.getVisitorRequirements();
+      if (requirementsJson != null && requirementsJson.isNotEmpty) {
+        final data = jsonDecode(requirementsJson) as Map<String, dynamic>;
+        reqPhone = data['req_phone'] as bool? ?? false;
+        reqWorkType = data['req_work_type'] as bool? ?? false;
+        reqCompany = data['req_company'] as bool? ?? false;
+        reqAddress = data['req_address'] as bool? ?? false;
+        reqSupervisor = data['req_supervisor'] as bool? ?? false;
+        reqSignInTime = data['req_sign_in_time'] as bool? ?? false;
+        reqVisitorPhoto = data['req_visitor_photo'] as bool? ?? false;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading visitor requirements: $e');
+    }
+  }
+
+  /// Save visitor field requirements to secure storage
+  Future<void> _saveVisitorRequirements() async {
+    try {
+      final requirements = {
+        'req_phone': reqPhone,
+        'req_work_type': reqWorkType,
+        'req_company': reqCompany,
+        'req_address': reqAddress,
+        'req_supervisor': reqSupervisor,
+        'req_sign_in_time': reqSignInTime,
+        'req_visitor_photo': reqVisitorPhoto,
+      };
+      await SecureStorageService.saveVisitorRequirements(jsonEncode(requirements));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error saving visitor requirements: $e');
+      }
+    }
+  }
+
+  // ========== PRINT SETTINGS PERSISTENCE ==========
+
+  /// Load print settings from secure storage
+  Future<void> _loadPrintSettings() async {
+    try {
+      final settingsJson = await SecureStorageService.getPrintSettings();
+      if (settingsJson != null && settingsJson.isNotEmpty) {
+        final data = jsonDecode(settingsJson) as Map<String, dynamic>;
+        printVisitorBadge = data['print_visitor_badge'] as bool? ?? true;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading print settings: $e');
+    }
+  }
+
+  /// Save print settings to secure storage
+  Future<void> _savePrintSettings() async {
+    try {
+      final settings = {
+        'print_visitor_badge': printVisitorBadge,
+      };
+      await SecureStorageService.savePrintSettings(jsonEncode(settings));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error saving print settings: $e');
+      }
+    }
   }
 
   // ========== CLEANUP ==========

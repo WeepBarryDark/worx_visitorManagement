@@ -12,6 +12,7 @@ import 'package:worxvisitorapp/features/visitor_kiosk/views/visitor_kiosk_page.d
 import 'package:worxvisitorapp/features/visitor_sign_in/views/visitor_sign_in_page.dart';
 import 'package:worxvisitorapp/features/visitor_sign_out/views/visitor_sign_out_page.dart';
 import 'package:worxvisitorapp/features/visitor_deliveries/views/visitor_deliveries_page.dart';
+import 'package:worxvisitorapp/features/contractor_sign_in/views/contractor_sign_in_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -38,6 +39,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.visitorSignIn: (context) => const VisitorSignInPage(),
         AppRoutes.visitorSignOut: (context) => const VisitorSignOutPage(),
         AppRoutes.visitorDeliveries: (context) => const VisitorDeliveriesPage(),
+        AppRoutes.contractorSignIn: (context) => const ContractorSignInPage(),
       },
     );
   }

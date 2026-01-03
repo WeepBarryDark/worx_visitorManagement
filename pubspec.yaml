@@ -31,6 +31,7 @@ dependencies:
   http: ^1.6.0
   mobile_scanner: ^7.1.4
   wakelock_plus: ^1.2.8
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

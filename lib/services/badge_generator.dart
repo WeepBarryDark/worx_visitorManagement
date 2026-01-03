@@ -26,6 +26,7 @@ class BadgeData {
   final String siteName;
   final Uint8List? clientLogoBytes;  // Custom client logo bytes (overrides default)
   final String? clientLogoUrl;  // Custom client logo URL (downloaded if provided)
+  final Uint8List? visitorPhotoBytes;  // Visitor photo captured during sign-in
 
   const BadgeData({
     required this.visitorId,
@@ -40,6 +41,7 @@ class BadgeData {
     required this.siteName,
     this.clientLogoBytes,
     this.clientLogoUrl,
+    this.visitorPhotoBytes,
   });
 }
 

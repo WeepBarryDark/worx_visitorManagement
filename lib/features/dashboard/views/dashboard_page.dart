@@ -297,7 +297,19 @@ class _DashboardPageState extends State<DashboardPage> {
 
       // Parse contacts
       if (contactsData != null && contactsData.isNotEmpty) {
-        final List<dynamic> contactsList = jsonDecode(contactsData);
+        final decoded = jsonDecode(contactsData);
+        List<dynamic> contactsList;
+
+        // Handle both List and Map responses
+        if (decoded is List) {
+          contactsList = decoded;
+        } else if (decoded is Map && decoded.containsKey('data')) {
+          // If it's a Map with 'data' key, extract the list
+          contactsList = decoded['data'] as List<dynamic>;
+        } else {
+          throw Exception('Invalid contacts data format');
+        }
+
         final supervisors = contactsList
             .map((json) => ContactDetail.fromMap(json as Map<String, dynamic>))
             .toList();

@@ -426,9 +426,10 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
               contentPadding: EdgeInsets.zero,
             ),
 
-            // Paper Type Selection
-            const SizedBox(height: 16),
-            Container(
+            // Paper Type Selection - Only show when printer is connected
+            if (c.initialized) ...[
+              const SizedBox(height: 16),
+              Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppTheme.statusBackgroundColor('info'),
@@ -546,7 +547,8 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                   ),
                 ],
               ),
-            ),
+              ),
+            ],
           ],
         ),
       ),
@@ -687,6 +689,14 @@ class VisitorRequirementFieldsCard extends StatelessWidget {
               onChanged: (v) =>
                   onRequirementChange(c.setReqSignInTime, v ?? false),
               title: const Text('Sign in time'),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+            ),
+            CheckboxListTile(
+              value: c.reqVisitorPhoto,
+              onChanged: (v) =>
+                  onRequirementChange(c.setReqVisitorPhoto, v ?? false),
+              title: const Text('Visitor photo'),
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
             ),
