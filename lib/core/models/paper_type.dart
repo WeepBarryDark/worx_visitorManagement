@@ -17,102 +17,26 @@ class PaperType {
     this.isSpecialTape = false, // Default to standard black/white
   });
 
-  /// Common paper types for visitor badges
-  /// Based on Brother QL series label name index specification
-  /// Includes both Black/White and Red/Black versions
+  /// Supported paper types for your Brother printer
+  /// PROBLEM: labelNameIndex=17 always maps to W62RB (Red/Black)
+  /// We use isSpecialTape to differentiate, but SDK ignores it
   static const List<PaperType> supportedTypes = [
-    // ========== BLACK/WHITE PAPER ==========
-
-    // Continuous length tape - most flexible
+    // DK-22205: Black on White continuous tape
     PaperType(
       labelNameIndex: 17,
-      name: '62mm Continuous (Black/White)',
-      description: 'Continuous length tape',
-      dimensions: '62mm width',
+      name: 'DK-22205 - 62mm Continuous White',
+      description: 'Black on White continuous tape',
+      dimensions: '62mm x 30.48m',
       isContinuous: true,
       isSpecialTape: false,
     ),
 
-    // Pre-cut labels - specific sizes
-    PaperType(
-      labelNameIndex: 4,
-      name: '62mm x 100mm (Black/White)',
-      description: 'Pre-cut label',
-      dimensions: '62mm x 100mm',
-      isContinuous: false,
-      isSpecialTape: false,
-    ),
-
-    PaperType(
-      labelNameIndex: 5,
-      name: '29mm x 90mm (Black/White)',
-      description: 'Pre-cut address label',
-      dimensions: '29mm x 90mm',
-      isContinuous: false,
-      isSpecialTape: false,
-    ),
-
-    PaperType(
-      labelNameIndex: 8,
-      name: '62mm x 29mm (Black/White)',
-      description: 'Pre-cut small label',
-      dimensions: '62mm x 29mm',
-      isContinuous: false,
-      isSpecialTape: false,
-    ),
-
-    PaperType(
-      labelNameIndex: 15,
-      name: '29mm Continuous (Black/White)',
-      description: 'Continuous length tape (narrow)',
-      dimensions: '29mm width',
-      isContinuous: true,
-      isSpecialTape: false,
-    ),
-
-    // ========== RED/BLACK PAPER ==========
-
+    // DK-22251: Black and Red on White continuous tape
     PaperType(
       labelNameIndex: 17,
-      name: '62mm Continuous (Red/Black)',
-      description: 'Continuous length tape (2-color)',
-      dimensions: '62mm width',
-      isContinuous: true,
-      isSpecialTape: true,
-    ),
-
-    PaperType(
-      labelNameIndex: 4,
-      name: '62mm x 100mm (Red/Black)',
-      description: 'Pre-cut label (2-color)',
-      dimensions: '62mm x 100mm',
-      isContinuous: false,
-      isSpecialTape: true,
-    ),
-
-    PaperType(
-      labelNameIndex: 5,
-      name: '29mm x 90mm (Red/Black)',
-      description: 'Pre-cut address label (2-color)',
-      dimensions: '29mm x 90mm',
-      isContinuous: false,
-      isSpecialTape: true,
-    ),
-
-    PaperType(
-      labelNameIndex: 8,
-      name: '62mm x 29mm (Red/Black)',
-      description: 'Pre-cut small label (2-color)',
-      dimensions: '62mm x 29mm',
-      isContinuous: false,
-      isSpecialTape: true,
-    ),
-
-    PaperType(
-      labelNameIndex: 15,
-      name: '29mm Continuous (Red/Black)',
-      description: 'Continuous length tape (2-color, narrow)',
-      dimensions: '29mm width',
+      name: 'DK-22251 - 62mm Continuous Black/Red',
+      description: 'Black and Red on White continuous tape',
+      dimensions: '62mm x 15.24m',
       isContinuous: true,
       isSpecialTape: true,
     ),

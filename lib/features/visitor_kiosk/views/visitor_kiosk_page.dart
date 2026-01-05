@@ -52,6 +52,9 @@ class _VisitorDashboardState extends State<VisitorDashboard> {
           debugPrint('Fail to persist select site: $e');
         }
       }
+      // Clear auto-navigate flag (we're manually going to dashboard from kiosk)
+      await SecureStorageService.clearAutoNavigateToKiosk();
+
       if (!context.mounted) return;
       Navigator.pushNamedAndRemoveUntil(
         context,
@@ -64,9 +67,7 @@ class _VisitorDashboardState extends State<VisitorDashboard> {
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
-    final DashboardController? c =
-        DashboardController.instance ??
-        (args is DashboardController ? args : null); // forward settings if any
+    final DashboardController? c = DashboardController.instance ?? (args is DashboardController ? args : null); // forward settings if any
     final backgroundImage = c?.backgroundImageUrl;
     final useCustomBackground =
         c?.useCustomBackground == true && backgroundImage != null;

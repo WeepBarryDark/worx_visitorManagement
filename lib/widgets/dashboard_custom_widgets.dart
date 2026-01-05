@@ -21,6 +21,7 @@ class KeyValue extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 100,
@@ -32,9 +33,13 @@ class KeyValue extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              value,
+              value.isEmpty ? '-' : value,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              softWrap: true,
               style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
@@ -59,7 +64,7 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
   bool _isAddingManualPrinter = false;
   bool _showManualInput = false;
   String? _manualInputError;
-  PaperType _selectedPaperType = PaperType.defaultType;
+  PaperType? _selectedPaperType;
   bool _isLoadingPaperType = true;
 
   @override
@@ -81,16 +86,17 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
     });
 
     final savedPaperTypeJson = await SecureStorageService.getPaperType();
-    if (savedPaperTypeJson != null) {
-      try {
+    try {
+      if (savedPaperTypeJson != null) {
         final paperTypeData = jsonDecode(savedPaperTypeJson) as Map<String, dynamic>;
         final paperType = PaperType.fromJson(paperTypeData);
         setState(() {
           _selectedPaperType = paperType;
         });
-      } catch (e) {
-        debugPrint('Error loading paper type: $e');
       }
+      // If no saved value, _selectedPaperType remains null (user must select)
+    } catch (e) {
+      debugPrint('Error loading paper type: $e');
     }
 
     setState(() {
@@ -99,14 +105,14 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
   }
 
   /// Save selected paper type
-  Future<void> _savePaperType(PaperType paperType) async {
+  Future<void> _savePaperType(PaperType paperType, {bool showFeedback = true}) async {
     final paperTypeJson = jsonEncode(paperType.toJson());
     await SecureStorageService.savePaperType(paperTypeJson);
     setState(() {
       _selectedPaperType = paperType;
     });
 
-    if (!mounted) return;
+    if (!mounted || !showFeedback) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Paper type saved: ${paperType.name}'),
@@ -407,6 +413,7 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                       'Try using "Manual IP" to add your printer directly.',
                       style: TextStyle(
                         fontSize: 13,
+                        overflow: TextOverflow.ellipsis,
                         color: AppTheme.slate700,
                         height: 1.5,
                       ),
@@ -449,12 +456,29 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                         size: 20,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        'Paper Type',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: AppTheme.slate800,
+                      Expanded(
+                        child: Text(
+                          'Paper Type',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: AppTheme.slate800,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.dangerColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'REQUIRED',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -477,74 +501,163 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                     )
                   else
                     DropdownButtonFormField<PaperType>(
-                      value: _selectedPaperType,
+                      initialValue: _selectedPaperType,
+                      isExpanded: true,
+                      itemHeight: 72,
                       decoration: InputDecoration(
                         labelText: 'Select Paper Type',
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.print),
                         filled: true,
                         fillColor: Colors.white,
+                        errorText: _selectedPaperType == null ? 'Please select a paper type' : null,
                       ),
                       items: PaperType.supportedTypes.map((paperType) {
                         return DropdownMenuItem<PaperType>(
                           value: paperType,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                paperType.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                paperType.description,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppTheme.slate600,
-                                ),
-                              ),
-                            ],
+                          child: ListTile(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              paperType.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            /*
+                            subtitle: Text(
+                              paperType.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: AppTheme.slate600),
+                            ),*/
                           ),
                         );
                       }).toList(),
                       onChanged: (paperType) {
-                        if (paperType != null) {
-                          _savePaperType(paperType);
-                        }
+                        if (paperType != null) _savePaperType(paperType);
                       },
                     ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: AppTheme.slate200,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: AppTheme.slate600,
+                  if (_selectedPaperType == null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.statusBackgroundColor('warning'),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppTheme.warningColor.withValues(alpha: 0.3),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Current: ${_selectedPaperType.dimensions}${_selectedPaperType.isContinuous ? ' (continuous)' : ''}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.slate700,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber,
+                            size: 16,
+                            color: AppTheme.warningColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Paper type selection is required before printing',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.warningColor,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ] else ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please double check the paper type, as it may be selected wrong.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.warningColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      if (!widget.controller.initialized ||
+                          widget.controller.printerService.selectedPrinter == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Connect a printer before running a test print.'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        return;
+                      }
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Sending test print...'),
+                          backgroundColor: AppTheme.primaryBlue,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+
+                      try {
+                        final ok = await widget.controller.printerService.printTestLabel();
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(ok ? 'Test print sent successfully.' : 'Test print failed.'),
+                            backgroundColor: ok ? AppTheme.successColor : Colors.red,
+                          ),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Test print error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.print),
+                    label: const Text('Run Test Print'),
                   ),
+                  if (_selectedPaperType != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppTheme.slate200,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: AppTheme.slate600,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Current: ${_selectedPaperType!.dimensions}${_selectedPaperType!.isContinuous ? ' (continuous)' : ''}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.slate700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
               ),
@@ -565,6 +678,7 @@ class VisitorRequirementFieldsCard extends StatelessWidget {
     this.contactsError,
     required this.loadVisitorContacts,
     required this.onRequirementChange,
+    this.onPreviewGenerated,
   });
 
   final DashboardController controller;
@@ -573,6 +687,7 @@ class VisitorRequirementFieldsCard extends StatelessWidget {
   final Future<void> Function({bool forceApiFetch}) loadVisitorContacts;
   final void Function(void Function(bool) setter, bool value)
   onRequirementChange;
+  final VoidCallback? onPreviewGenerated;
 
   @override
   Widget build(BuildContext context) {
@@ -705,6 +820,8 @@ class VisitorRequirementFieldsCard extends StatelessWidget {
             FilledButton(
               onPressed: () {
                 c.generatePreview();
+                // Scroll to preview after it's generated
+                onPreviewGenerated?.call();
               },
               child: const Text('Preview Visitor Badge'),
             ),

@@ -499,7 +499,7 @@ https://app.worxsafety.com.au/qr-login/ada81466-a91e-4a7c-852b-231d09f22db1
 ✅ Authentication success, token saved.
 
 client list 
-{logo: https://storage.worxsafety.com.au/site/public/22080/pblogo.svg, name: HUGH ARTHUR TORNEY, trading_name: Pink Batteries}
+{"logo":"https://storage.worxsafety.com.au/site/public/22080/pblogo.svg","background_image":"https://storage.worxsafety.com.au/site/public/7/60dbb67c245b3_bg-masthead.jpg","name":"HUGH ARTHUR TORNEY","trading_name":"Pink Batteries"}
 
 contact list---------------
 {count: 19, data: [{id: 31, name: Luke One, email: luke.1@neboengineering.com.au, phone: 0405756899, mobile: 0405765432, emergencyContact: Luke Two, emergencyPhone: null, workType: {id: 20, name: Engineering}, residency: Australian Citizen, residencyDetails: null, residencyExpiry: 2025-12-08T04:34:16+00:00, dob: 1978-10-05T00:00:00+00:00, role: user, approved: 0, approvalDate: 2025-12-08T04:34:16+00:00, approver: {id: null, name: null}, status: Pending, revokeReason: Your induction has expired please redo your induction., createdOn: 2021-10-05T06:34:45+00:00, active: 1}, {id: 3231, name: David Moodie, email: david@101design.com.au, phone: 02 4226 2102, mobile: 0402 681 626, emergencyContact: Good Luck, emergencyPhone: null, workType: {id: 59, name: IT Services}, residency: Australian Citizen, residencyDetails: null, residencyExpiry: 2025-12-08T04:34:16+00:00, dob: 1979-05-28T00:00:00+00:00, role: admin, approved: 1, approvalDate: 2024-09-09T02:12:47+00:00, approver: {id: 23, name: Hugh Torney}, status: Appro

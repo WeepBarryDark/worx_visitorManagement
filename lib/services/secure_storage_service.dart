@@ -33,6 +33,7 @@ class SecureStorageService {
   static const String _keyPaperType = 'printer_paper_type'; // Store selected paper type
   static const String _keyVisitorRequirements = 'visitor_requirements'; // Store required visitor fields
   static const String _keyPrintSettings = 'print_settings'; // Store print-related settings
+  static const String _keyAutoNavigateToKiosk = 'auto_navigate_to_kiosk'; // Flag to auto-navigate to kiosk after dashboard loads
 
   // Data fetch failure tracking keys
   static const String _keyFetchFailureSites = 'fetch_failure_sites';
@@ -726,6 +727,42 @@ class SecureStorageService {
       await _storage.delete(key: _keyPrintSettings);
     } catch (e) {
       debugPrint('Error clearing print settings: $e');
+    }
+  }
+
+  // ========== AUTO-NAVIGATE TO KIOSK FLAG ==========
+
+  /// Save flag to auto-navigate to kiosk after dashboard loads
+  static Future<void> saveAutoNavigateToKiosk(bool shouldNavigate) async {
+    try {
+      await _storage.write(
+        key: _keyAutoNavigateToKiosk,
+        value: shouldNavigate.toString(),
+      );
+      debugPrint('Auto-navigate to kiosk flag saved: $shouldNavigate');
+    } catch (e) {
+      debugPrint('Error saving auto-navigate flag: $e');
+    }
+  }
+
+  /// Get auto-navigate to kiosk flag
+  static Future<bool> getAutoNavigateToKiosk() async {
+    try {
+      final value = await _storage.read(key: _keyAutoNavigateToKiosk);
+      return value == 'true';
+    } catch (e) {
+      debugPrint('Error reading auto-navigate flag: $e');
+      return false;
+    }
+  }
+
+  /// Clear auto-navigate to kiosk flag
+  static Future<void> clearAutoNavigateToKiosk() async {
+    try {
+      await _storage.delete(key: _keyAutoNavigateToKiosk);
+      debugPrint('Auto-navigate to kiosk flag cleared');
+    } catch (e) {
+      debugPrint('Error clearing auto-navigate flag: $e');
     }
   }
 }

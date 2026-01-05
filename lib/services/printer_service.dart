@@ -3,8 +3,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' as painting;
 
 import 'package:another_brother/printer_info.dart' as printer;
+import 'package:another_brother/label_info.dart' show QL700;
 import 'package:worxvisitorapp/services/secure_storage_service.dart';
 import 'package:worxvisitorapp/core/models/paper_type.dart';
 import 'package:worxvisitorapp/core/models/print_status.dart';
@@ -712,6 +714,101 @@ class PrinterService {
     }
   }
 
+  /// Auto-detect paper type from printer
+  /// Returns the detected PaperType, or null if detection fails
+  Future<PaperType?> detectPaperType() async {
+    if (selectedPrinter?.printerInfo == null) {
+      debugPrint('Cannot detect paper type: No printer selected');
+      return null;
+    }
+
+    try {
+      final printerInstance = printer.Printer();
+      printer.Printer.setUserPrinterInfo(selectedPrinter!.printerInfo!);
+
+      final status = await printerInstance.getPrinterStatus().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('Paper type detection timeout');
+          throw TimeoutException('Detection timeout');
+        },
+      );
+
+      // Check for errors first
+      if (status.errorCode != printer.ErrorCode.ERROR_NONE) {
+        debugPrint('Printer error during detection: ${status.errorCode.getName()}');
+        return null;
+      }
+
+      // Get label information
+      final labelId = status.labelId;
+      final labelType = status.labelType;
+      final labelColor = status.labelColor;
+
+      debugPrint('===== PAPER DETECTION DEBUG =====');
+      debugPrint('labelId: $labelId');
+      debugPrint('labelType: $labelType');
+      debugPrint('labelColor: $labelColor');
+
+      // Determine if it's special tape (Red/Black) based on labelColor
+      // LabelColor enum values (from Brother SDK):
+      // - White = standard Black/White tape (DK-22205)
+      // - Other = Red/Black tape (DK-22251)
+      // - RedWhite = Red/Black tape
+      bool isSpecialTape = false;
+      if (labelColor != null) {
+        final colorName = labelColor.getName();
+        debugPrint('labelColor.getName(): $colorName');
+
+        // Check if it's a special (Red/Black) tape
+        // If color contains "Other" or "Red" -> Red/Black tape (DK-22251)
+        // If color contains "White" only -> Black/White tape (DK-22205)
+        if (colorName.contains('Other') || colorName.contains('Red')) {
+          isSpecialTape = true;
+        } else if (colorName.contains('White')) {
+          isSpecialTape = false;
+        } else {
+          // Unknown color, default to Black/White
+          debugPrint('WARNING: Unknown color "$colorName", defaulting to Black/White');
+          isSpecialTape = false;
+        }
+
+        debugPrint('Is special tape (Red/Black): $isSpecialTape');
+      } else {
+        debugPrint('WARNING: labelColor is null, defaulting to Black/White tape');
+        isSpecialTape = false;
+      }
+
+      // Map labelId to labelNameIndex
+      // For DK-22205 and DK-22251, both use labelNameIndex 17 (62mm continuous)
+      int labelNameIndex = labelId ?? 17; // Default to 62mm continuous
+
+      debugPrint('Using labelNameIndex: $labelNameIndex');
+
+      // Find matching paper type
+      final detectedType = PaperType.supportedTypes.firstWhere(
+        (type) => type.labelNameIndex == labelNameIndex &&
+                  type.isSpecialTape == isSpecialTape,
+        orElse: () {
+          debugPrint('WARNING: No exact match found, using default type');
+          return PaperType.defaultType;
+        },
+      );
+
+      debugPrint('Auto-detected paper type: ${detectedType.name}');
+      debugPrint('================================');
+
+      // Save the detected paper type
+      final paperTypeJson = jsonEncode(detectedType.toJson());
+      await SecureStorageService.savePaperType(paperTypeJson);
+
+      return detectedType;
+    } catch (e) {
+      debugPrint('Error detecting paper type: $e');
+      return null;
+    }
+  }
+
   /// Print image with optional status callback
   Future<bool> printImage(
     dynamic image, {
@@ -780,7 +877,9 @@ class PrinterService {
         }
       }
 
-      debugPrint('Paper config: labelNameIndex=$labelNameIndex, isSpecialTape=$isSpecialTape (${isSpecialTape ? "Red/Black" : "Black/White"})');
+      debugPrint('===== PRINT JOB CONFIGURATION =====');
+      debugPrint('labelNameIndex: $labelNameIndex');
+      debugPrint('isSpecialTape: $isSpecialTape (${isSpecialTape ? "Red/Black" : "Black/White"})');
 
       // Status: Preparing print job
       onStatusUpdate?.call(PrintProgress.sending());
@@ -791,25 +890,74 @@ class PrinterService {
       printerInfo.isCutAtEnd = true;
       printerInfo.printMode = printer.PrintMode.FIT_TO_PAGE;
       printerInfo.halftone = printer.Halftone.ERRORDIFFUSION;
-      printerInfo.labelNameIndex = labelNameIndex;
-      printerInfo.isSpecialTape = isSpecialTape; // Apply color type
+
+      // SOLUTION: Use QL700 enum directly to force correct label type
+      // Using .index to get the ordinal value of the enum
+
+      printerInfo.skipStatusCheck = false;
+
+      // Force specific label name using QL700 enum
+      if (isSpecialTape) {
+        // DK-22251: Red/Black 62mm continuous
+        final labelIndex = QL700.ordinalFromID(QL700.W62RB.getId());
+        printerInfo.labelNameIndex = labelIndex;
+        printerInfo.isSpecialTape = true;
+        debugPrint('Using QL700.W62RB (Red/Black mode) - labelNameIndex: $labelIndex');
+      } else {
+        // DK-22205: Black/White 62mm continuous
+        final labelIndex = QL700.ordinalFromID(QL700.W62.getId());
+        printerInfo.labelNameIndex = labelIndex;
+        printerInfo.isSpecialTape = false;
+        debugPrint('Using QL700.W62 (Monochrome mode) - labelNameIndex: $labelIndex');
+      }
+
       printerInfo.workPath = '';
+
+      debugPrint('PrinterInfo configured successfully');
 
       final printerInstance = printer.Printer();
       printer.Printer.setUserPrinterInfo(printerInfo);
+
+      // Get current printer status before printing
+      try {
+        final currentStatus = await printerInstance.getPrinterStatus().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => throw TimeoutException('Status check timeout'),
+        );
+        debugPrint('Current printer status:');
+        debugPrint('  errorCode: ${currentStatus.errorCode.getName()}');
+        debugPrint('  labelId: ${currentStatus.labelId}');
+        debugPrint('  labelType: ${currentStatus.labelType}');
+        debugPrint('  labelColor: ${currentStatus.labelColor?.getName()}');
+      } catch (e) {
+        debugPrint('Could not get current status: $e');
+      }
 
       await Future.delayed(const Duration(milliseconds: 300));
 
       // Status: Sending to printer
       onStatusUpdate?.call(PrintProgress.printing());
 
+      debugPrint('Sending print job to printer...');
       final printResult = await printerInstance.printImage(image);
+
+      debugPrint('Print result errorCode: ${printResult.errorCode.getName()}');
 
       if (printResult.errorCode != printer.ErrorCode.ERROR_NONE) {
         errorMessage = 'Print error: ${printResult.errorCode.getName()}';
+        debugPrint('===== PRINT FAILED =====');
+        debugPrint('Error: $errorMessage');
+        debugPrint('Possible causes:');
+        debugPrint('  1. Wrong paper type selected (labelNameIndex mismatch)');
+        debugPrint('  2. Wrong color mode (isSpecialTape mismatch)');
+        debugPrint('  3. Paper not loaded correctly');
+        debugPrint('  4. Paper cover open');
+        debugPrint('=======================');
         onStatusUpdate?.call(PrintProgress.failed(errorMessage!));
         return false;
       }
+
+      debugPrint('===== PRINT SUCCESS =====');
 
       // Status: Completed
       onStatusUpdate?.call(PrintProgress.completed());
@@ -840,5 +988,51 @@ class PrinterService {
   void dispose() {
     discoveredPrinters.clear();
     selectedPrinter = null;
+  }
+
+  /// Simple test print (text-based) to verify connection and paper type
+  Future<bool> printTestLabel() async {
+    if (kIsWeb) {
+      errorMessage = 'Web printing not supported';
+      return false;
+    }
+    if (selectedPrinter?.printerInfo == null) {
+      errorMessage = 'No printer selected';
+      return false;
+    }
+
+    try {
+      // Build a small placeholder image as test content
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      final paint = ui.Paint()..color = ui.Color(0xFFFFFFFF);
+      const double width = 400;
+      const double height = 200;
+      canvas.drawRect(ui.Rect.fromLTWH(0, 0, width, height), paint);
+
+      final textPainter = painting.TextPainter(
+        text: painting.TextSpan(
+          text: 'Test print\nPlease verify paper type & alignment',
+          style: painting.TextStyle(color: ui.Color(0xFF000000), fontSize: 18),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      );
+      textPainter.layout(maxWidth: width - 40);
+      textPainter.paint(canvas, ui.Offset(20, 20));
+
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(width.toInt(), height.toInt());
+
+      return await _printMobile(
+        image,
+        onStatusUpdate: (progress) {
+          debugPrint('Test print status: ${progress.message}');
+        },
+      );
+    } catch (e) {
+      errorMessage = 'Test print failed: $e';
+      debugPrint(errorMessage);
+      return false;
+    }
   }
 }

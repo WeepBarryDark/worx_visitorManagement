@@ -454,7 +454,11 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
 
   /// Show list of signed-in visitors for selection
   Future<void> _showSignedInVisitorsList() async {
+    debugPrint('=== OPENING SIGNED-IN VISITORS DIALOG ===');
+    debugPrint('Visitors count: ${_visitorsById.length}');
+
     if (_visitorsById.isEmpty) {
+      debugPrint('No visitors found - showing snackbar');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No signed-in visitors found on this device'),
@@ -465,30 +469,50 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
     }
 
     final visitors = _visitorsById.values.toList();
+    debugPrint('Showing dialog with ${visitors.length} visitors');
 
-    final selectedVisitor = await showDialog<_SignedVisitor>(
-      context: context,
-      builder: (context) => _SearchableVisitorDialog(visitors: visitors),
-    );
+    try {
+      final selectedVisitor = await showDialog<_SignedVisitor>(
+        context: context,
+        barrierDismissible: true, // Allow dismissing by tapping outside
+        builder: (context) {
+          debugPrint('Building dialog...');
+          return _SearchableVisitorDialog(visitors: visitors);
+        },
+      );
 
-    if (selectedVisitor != null) {
-      setState(() {
-        _visitorIdCtrl.text = selectedVisitor.id;
-        _scannedFromQR = false;
-      });
+      debugPrint('Dialog closed. Selected visitor: ${selectedVisitor?.id ?? "none"}');
+
+      if (selectedVisitor != null) {
+        setState(() {
+          _visitorIdCtrl.text = selectedVisitor.id;
+          _scannedFromQR = false;
+        });
+
+        if (!mounted) return;
+
+        // Clear any existing snackbars first
+        ScaffoldMessenger.of(context).clearSnackBars();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '✓ Selected: ${selectedVisitor.fullName} (${selectedVisitor.id})',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ERROR showing dialog: $e');
+      debugPrint('Stack trace: $stackTrace');
 
       if (!mounted) return;
-
-      // Clear any existing snackbars first
-      ScaffoldMessenger.of(context).clearSnackBars();
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '✓ Selected: ${selectedVisitor.fullName} (${selectedVisitor.id})',
-          ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
+          content: Text('Error loading visitors: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -746,15 +770,14 @@ class _SearchableVisitorDialogState extends State<_SearchableVisitorDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ConstrainedBox(
+      child: Container(
         constraints: BoxConstraints(
           maxHeight: dialogHeight,
           maxWidth: dialogMaxWidth,
         ),
-        child: IntrinsicHeight(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             // Header
             Container(
               padding: const EdgeInsets.all(20),
@@ -842,7 +865,7 @@ class _SearchableVisitorDialogState extends State<_SearchableVisitorDialog> {
             const SizedBox(height: 12),
 
             // Visitor list
-            Flexible(
+            Expanded(
               child: filteredVisitors.isEmpty
                   ? Container(
                       constraints: BoxConstraints(
@@ -981,7 +1004,6 @@ class _SearchableVisitorDialogState extends State<_SearchableVisitorDialog> {
             ),
           ],
         ),
-      ),
       ),
     );
   }

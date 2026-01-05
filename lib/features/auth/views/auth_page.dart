@@ -139,19 +139,49 @@ class _AuthPage extends State<AuthPage> {
 
       await SecureStorageService.saveSites(jsonEncode(sites));
 
-      // Get client by API key - Fetch and cache client (branding/background) so downstream pages can read it from storage
-      final clientJson = await ApiService.fetchVisitorClient(savedToken);
-      await SecureStorageService.saveClient(jsonEncode(clientJson));
+      // Get client data - Check local storage first, only fetch from API if not cached
+      String? cachedClientJson = await SecureStorageService.getClient();
+
+      if (cachedClientJson == null || cachedClientJson.isEmpty) {
+        // No cached client data → fetch from API
+        debugPrint('📥 Fetching client data from API (first time)...');
+        final clientJson = await ApiService.fetchVisitorClient(savedToken);
+        await SecureStorageService.saveClient(jsonEncode(clientJson));
+        cachedClientJson = jsonEncode(clientJson);
+        debugPrint('✓ Client data cached to local storage');
+      } else {
+        debugPrint('✓ Using cached client data from local storage');
+      }
+
+      //debugPrint('Client data: $cachedClientJson');
 
       if (!mounted) return;
-      //If there is a saved selected site, go to the selected site directly 
+      //If there is a saved selected site, check if we can go directly to kiosk
       final String? selectedSiteJson = await SecureStorageService.getSelectedSite();
       final bool hasSelectedSite = selectedSiteJson != null && selectedSiteJson.trim().isNotEmpty;
 
       if (!mounted) return;
       if (hasSelectedSite) {
+        // Check if admin PIN is set (indicates kiosk is configured)
+        final String? adminPin = await SecureStorageService.getAdminPin();
+        final bool hasAdminPin = adminPin != null && adminPin.trim().isNotEmpty;
+
         if (!context.mounted) return;
-        Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
+
+        if (hasAdminPin) {
+          // All kiosk parameters ready → go to dashboard, it will auto-navigate to kiosk
+          // Store a flag to indicate we should auto-navigate to kiosk
+          await SecureStorageService.saveAutoNavigateToKiosk(true);
+
+          if (!context.mounted) return;
+          Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
+        } else {
+          // Site selected but no admin PIN → go to dashboard for setup (don't auto-navigate)
+          await SecureStorageService.clearAutoNavigateToKiosk();
+
+          if (!context.mounted) return;
+          Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
+        }
         return;
       }
       //------------------------------------------------------------------end selected site directly
@@ -172,7 +202,7 @@ class _AuthPage extends State<AuthPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            "Offline or Server unreachable. Check Internet Connection and restart this app. If its not internet issue, please contact developer",
+            "Offline or Server Unreachable. Check Internet Connection and restart this app. If its not internet issue, please contact developer",
           ),
           duration: Duration(seconds: 5),
         ),

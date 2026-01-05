@@ -4,7 +4,12 @@
       "Bash(flutter analyze:*)",
       "WebSearch",
       "WebFetch(domain:pub.dev)",
-      "Bash(flutter pub get:*)"
+      "Bash(flutter pub get:*)",
+      "Bash(findstr:*)",
+      "WebFetch(domain:bradshacks.com)",
+      "WebFetch(domain:support.brother.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(flutter pub:*)"
     ]
   }
 }

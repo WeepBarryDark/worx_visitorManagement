@@ -182,6 +182,9 @@ class _NewSitePageState extends State<NewSitePage> {
     // Save selected site to secure storage
     await SecureStorageService.saveSelectedSite(jsonEncode(site.toJson()));
 
+    // Clear auto-navigate flag (we're manually selecting a site)
+    await SecureStorageService.clearAutoNavigateToKiosk();
+
     // Navigate to dashboard with selected site
     if (mounted) {
       Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);

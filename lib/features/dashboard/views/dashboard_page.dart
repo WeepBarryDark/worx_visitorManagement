@@ -56,7 +56,9 @@ class _DashboardPageState extends State<DashboardPage> {
   String? _adminPinError;
   String? _adminPinStatus;
 
-  // ====== token for select =====
+  // ====== Scroll Controller for auto-scroll to preview ======
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _badgePreviewKey = GlobalKey();
 
   @override
   void initState() {
@@ -85,6 +87,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _adminPinCtrl.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -94,6 +97,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _isInitializing = true;
     });
 
+    // Load all dashboard data
     await Future.wait([
       _loadClientData(),
       _loadVisitorContacts(),
@@ -101,16 +105,43 @@ class _DashboardPageState extends State<DashboardPage> {
     ]);
 
     if (!mounted) return;
-    setState(() {
-      _isInitializing = false;
-    });
 
-    // Start printer initialization AFTER page data is loaded
-    // Delay longer (3 seconds) to allow user to navigate freely without blocking
-    // This prevents UI freezing when user enters Sign In page during printer scan
-    await Future.delayed(const Duration(seconds: 3));
-    if (!mounted) return;
-    _initializePrinter();
+    // Check if we should auto-navigate to kiosk BEFORE showing dashboard
+    final shouldNavigate = await SecureStorageService.getAutoNavigateToKiosk();
+
+    if (shouldNavigate) {
+      // Auto-navigating to kiosk - keep showing loading
+      debugPrint('🚀 Auto-navigating to kiosk...');
+
+      // Clear the flag so we don't auto-navigate next time
+      await SecureStorageService.clearAutoNavigateToKiosk();
+
+      // Start printer initialization in background
+      _initializePrinter();
+
+      // Small delay to ensure everything is loaded
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (!mounted) return;
+
+      // Navigate to kiosk with controller (loading stays visible until navigation)
+      Navigator.of(context).pushReplacementNamed(
+        AppRoutes.visitorKiosk,
+        arguments: widget.controller,
+      );
+    } else {
+      // NOT auto-navigating - show dashboard UI
+      setState(() {
+        _isInitializing = false;
+      });
+
+      // Start printer initialization AFTER page data is loaded
+      // Delay longer (3 seconds) to allow user to navigate freely without blocking
+      // This prevents UI freezing when user enters Sign In page during printer scan
+      await Future.delayed(const Duration(seconds: 3));
+      if (!mounted) return;
+      _initializePrinter();
+    }
   }
 
   /// Handle requirement field changes (with debouncing if needed)
@@ -121,6 +152,25 @@ class _DashboardPageState extends State<DashboardPage> {
   /// Handle notification setting changes
   void _handleNotificationChange(void Function(bool) setter, bool value) {
     setter(value);
+  }
+
+  /// Scroll to badge preview card after preview is generated
+  void _scrollToBadgePreview() {
+    // Wait a bit for the preview card to render
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
+      final context = _badgePreviewKey.currentContext;
+      if (context != null) {
+        // Use Scrollable.ensureVisible for smooth scrolling
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+          alignment: 0.1, // Position preview near top (10% from top)
+        );
+      }
+    });
   }
 
   // ===========================
@@ -429,6 +479,11 @@ class _DashboardPageState extends State<DashboardPage> {
       onRequirementChange: _handleRequirementChange,
       onNotificationChange: _handleNotificationChange,
 
+      // scroll and preview
+      scrollController: _scrollController,
+      badgePreviewKey: _badgePreviewKey,
+      onPreviewGenerated: _scrollToBadgePreview,
+
       // misc
       showToast: _toast,
     );
@@ -494,6 +549,11 @@ class _LoadedDashboardInterface extends StatelessWidget {
     required this.onRequirementChange,
     required this.onNotificationChange,
 
+    // scroll and preview
+    required this.scrollController,
+    required this.badgePreviewKey,
+    required this.onPreviewGenerated,
+
     // misc
     required this.showToast,
   });
@@ -527,6 +587,11 @@ class _LoadedDashboardInterface extends StatelessWidget {
   final void Function(void Function(bool) setter, bool value)
   onNotificationChange;
 
+  // scroll and preview
+  final ScrollController scrollController;
+  final GlobalKey badgePreviewKey;
+  final VoidCallback onPreviewGenerated;
+
   // misc
   final void Function(String msg) showToast;
 
@@ -550,6 +615,7 @@ class _LoadedDashboardInterface extends StatelessWidget {
           builder: (context, _) {
             return Center(
               child: SingleChildScrollView(
+                controller: scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: maxBodyWidth),
@@ -587,11 +653,13 @@ class _LoadedDashboardInterface extends StatelessWidget {
                         contactsError: contactsError,
                         loadVisitorContacts: loadVisitorContacts,
                         onRequirementChange: onRequirementChange,
+                        onPreviewGenerated: onPreviewGenerated,
                       ),
                       const SizedBox(height: 16),
 
                       // Badge Preview Card
                       BadgePreviewCard(
+                        key: badgePreviewKey,
                         controller: controller,
                         onNotificationChange: onNotificationChange,
                       ),

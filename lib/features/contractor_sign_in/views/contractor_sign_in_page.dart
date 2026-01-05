@@ -16,18 +16,22 @@ class ContractorSignInPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
-    final DashboardController? c =
-        DashboardController.instance ??
-        (args is DashboardController ? args : null);
+    final DashboardController? c = DashboardController.instance ?? (args is DashboardController ? args : null);
 
     final backgroundImage = c?.backgroundImageUrl;
-    final useCustomBackground =
-        c?.useCustomBackground == true && backgroundImage != null;
+    final useCustomBackground = c?.useCustomBackground == true && backgroundImage != null;
     final siteTitle = c?.resolveSiteHeading('Contractor Sign In') ?? 'Contractor Sign In';
     final logoBytes = c?.clientLogoDisplayBytes;
 
-    const double maxBodyWidth = AppBreakpoints.compact;
+    // Build URL with project ID from selected site
+    // Format: https://app.worxsafety.com.au/precisioninstallations/projects/view/{siteId}
+    final siteId = c?.currentSite?.id ?? '';
+    final String siteUrl = siteId.isNotEmpty
+        ? 'https://app.worxsafety.com.au/precisioninstallations/projects/view/$siteId'
+        : ServerLink.mainServerURL; // Fallback to default URL if no site selected
 
+    const double maxBodyWidth = AppBreakpoints.compact;
+    
     return KioskGuard(
       child: Scaffold(
         body: Container(
@@ -92,7 +96,7 @@ class ContractorSignInPage extends StatelessWidget {
                                 ],
                               ),
                               child: QrImageView(
-                                data: ServerLink.mainServerURL,
+                                data: siteUrl,
                                 version: QrVersions.auto,
                                 size: 280,
                                 backgroundColor: Colors.white,
