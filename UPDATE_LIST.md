@@ -12,7 +12,7 @@ A: Hold, required client Slug API
 - log deliveries in Site ledger
 A: Hold, an API is required for this featur.
 - Check app doesnt go to sleep, also if you can restrict closing it, or opening another app (this might be an ipad setting, not an app setting). 
-A:Done, dependencies:
+A:Done, dependencies: doesn't work in ios
     1.Package: wakelock_plus: ^1.2.8 (pubspec.yaml:33)
     2.Service: KioskModeService (lib/services/kiosk_mode_service.dart)
 

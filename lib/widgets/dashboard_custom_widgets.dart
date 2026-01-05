@@ -606,6 +606,7 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
 
                       try {
                         final ok = await widget.controller.printerService.printTestLabel();
+                        if (!context.mounted) return;
                         ScaffoldMessenger.of(context).hideCurrentSnackBar();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(

@@ -4,6 +4,7 @@ import 'dart:developer' as dev;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/scheduler.dart';
 
 // Models
 import 'package:worxvisitorapp/core/models/site_item.dart';
@@ -156,20 +157,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
   /// Scroll to badge preview card after preview is generated
   void _scrollToBadgePreview() {
-    // Wait a bit for the preview card to render
-    Future.delayed(const Duration(milliseconds: 300), () {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      final context = _badgePreviewKey.currentContext;
-      if (context != null) {
-        // Use Scrollable.ensureVisible for smooth scrolling
-        Scrollable.ensureVisible(
-          context,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-          alignment: 0.1, // Position preview near top (10% from top)
-        );
-      }
+      final targetContext = _badgePreviewKey.currentContext;
+      if (targetContext == null) return;
+
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
     });
   }
 

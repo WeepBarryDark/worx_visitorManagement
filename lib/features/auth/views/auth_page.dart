@@ -111,6 +111,9 @@ class _AuthPage extends State<AuthPage> {
   ///   - e.g. /new-site vs /dashboard based on stored sites
   /// Navigate to site selection or dashboard based on number of sites
   Future<void> _navigateBasedOnSites() async {
+    //cache context-dependent objects BEFORE any await
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     //Get the saved token
     final savedToken = await SecureStorageService.getAuthToken();
     //verify Token
@@ -163,8 +166,8 @@ class _AuthPage extends State<AuthPage> {
       if (!mounted) return;
       if (hasSelectedSite) {
         // Check if admin PIN is set (indicates kiosk is configured)
-        final String? adminPin = await SecureStorageService.getAdminPin();
-        final bool hasAdminPin = adminPin != null && adminPin.trim().isNotEmpty;
+        final String adminPin = await SecureStorageService.getAdminPin();
+        final bool hasAdminPin = adminPin.trim().isNotEmpty;
 
         if (!context.mounted) return;
 
@@ -173,33 +176,33 @@ class _AuthPage extends State<AuthPage> {
           // Store a flag to indicate we should auto-navigate to kiosk
           await SecureStorageService.saveAutoNavigateToKiosk(true);
 
-          if (!context.mounted) return;
-          Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
+          if (!mounted) return;
+          nav.pushReplacementNamed(AppRoutes.dashboard);
         } else {
           // Site selected but no admin PIN → go to dashboard for setup (don't auto-navigate)
           await SecureStorageService.clearAutoNavigateToKiosk();
 
-          if (!context.mounted) return;
-          Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
+          if (!mounted) return;
+          nav.pushReplacementNamed(AppRoutes.dashboard);
         }
         return;
       }
       //------------------------------------------------------------------end selected site directly
 
       if (sites.length > 1 || sitesCount ==0 ||sites.isEmpty) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.newSite);
+        nav.pushReplacementNamed(AppRoutes.newSite);
       } else {
         // Save the single site as selected site before navigating to dashboard
         final singleSite = sites.first as Map<String, dynamic>;
         await SecureStorageService.saveSelectedSite(jsonEncode(singleSite));
         if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed(AppRoutes.dashboard);
+        nav.pushReplacementNamed(AppRoutes.dashboard);
       }
     } catch (e) {
       dev.log('auth fetches sites error, which is caused by $e');
       if (!mounted) return;
       //stay oj a8tu Screen and inform the user
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text(
             "Offline or Server Unreachable. Check Internet Connection and restart this app. If its not internet issue, please contact developer",

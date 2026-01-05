@@ -756,32 +756,28 @@ class PrinterService {
       // - Other = Red/Black tape (DK-22251)
       // - RedWhite = Red/Black tape
       bool isSpecialTape = false;
-      if (labelColor != null) {
-        final colorName = labelColor.getName();
-        debugPrint('labelColor.getName(): $colorName');
+      final colorName = labelColor.getName();
+      debugPrint('labelColor.getName(): $colorName');
 
-        // Check if it's a special (Red/Black) tape
-        // If color contains "Other" or "Red" -> Red/Black tape (DK-22251)
-        // If color contains "White" only -> Black/White tape (DK-22205)
-        if (colorName.contains('Other') || colorName.contains('Red')) {
-          isSpecialTape = true;
-        } else if (colorName.contains('White')) {
-          isSpecialTape = false;
-        } else {
-          // Unknown color, default to Black/White
-          debugPrint('WARNING: Unknown color "$colorName", defaulting to Black/White');
-          isSpecialTape = false;
-        }
-
-        debugPrint('Is special tape (Red/Black): $isSpecialTape');
+      // Check if it's a special (Red/Black) tape
+      // If color contains "Other" or "Red" -> Red/Black tape (DK-22251)
+      // If color contains "White" only -> Black/White tape (DK-22205)
+      if (colorName.contains('Other') || colorName.contains('Red')) {
+        isSpecialTape = true;
+      } else if (colorName.contains('White')) {
+        isSpecialTape = false;
       } else {
-        debugPrint('WARNING: labelColor is null, defaulting to Black/White tape');
+        // Unknown color, default to Black/White
+        debugPrint('WARNING: Unknown color "$colorName", defaulting to Black/White');
         isSpecialTape = false;
       }
 
+      debugPrint('Is special tape (Red/Black): $isSpecialTape');
+      
+
       // Map labelId to labelNameIndex
       // For DK-22205 and DK-22251, both use labelNameIndex 17 (62mm continuous)
-      int labelNameIndex = labelId ?? 17; // Default to 62mm continuous
+      int labelNameIndex = labelId; // Default to 62mm continuous
 
       debugPrint('Using labelNameIndex: $labelNameIndex');
 
