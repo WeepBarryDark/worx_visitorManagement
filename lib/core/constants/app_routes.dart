@@ -11,6 +11,7 @@ class AppRoutes {
   static const String visitorSignOut = '/visitor-sign-out';
   static const String visitorDeliveries = '/delivery';
   static const String contractorSignIn = '/contractor-sign-in';
+  static const String reprintBadge = '/reprint-badge';
 
   // Printer management
   static const String printerManagement = '/printer-management';

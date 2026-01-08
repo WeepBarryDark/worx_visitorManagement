@@ -207,8 +207,6 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
         visitorId: visitorId,
         authToken: authToken,
       );
-      //debugPrint("call sign-out API----------------------------------");
-      //print(result);
 
       if (!context.mounted) return;
       Navigator.pop(context); // Close loading
@@ -235,7 +233,6 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
 
         // Retrieve supervisor info from visitor record
         final supervisorId = visitorRecord.supervisorId;
-        //final supervisorName = visitorRecord.supervisorName;
         final supervisorEmail = visitorRecord.supervisorEmail;
         final supervisorPhone = visitorRecord.supervisorPhone;
         final notifyViaSms = visitorRecord.notifyViaSms;

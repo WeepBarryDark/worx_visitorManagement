@@ -31,6 +31,7 @@ class DashboardController extends ChangeNotifier {
   String printerName = 'Not connected';
   String printerIp = '-';
   bool printVisitorBadge = true; // Enable/disable automatic badge printing
+  bool hasTestPrinted = false; // Track if test print has been done (reset on paper type change)
 
   // Printer service for Network discovery
   final PrinterService printerService = PrinterService();
@@ -412,6 +413,18 @@ class DashboardController extends ChangeNotifier {
   void setPrintVisitorBadge(bool v) {
     printVisitorBadge = v;
     _savePrintSettings();
+    notifyListeners();
+  }
+
+  /// Mark test print as done
+  void markTestPrinted() {
+    hasTestPrinted = true;
+    notifyListeners();
+  }
+
+  /// Reset test print flag (called when paper type changes)
+  void resetTestPrintFlag() {
+    hasTestPrinted = false;
     notifyListeners();
   }
 

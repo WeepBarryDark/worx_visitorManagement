@@ -935,7 +935,12 @@ class PrinterService {
       onStatusUpdate?.call(PrintProgress.printing());
 
       debugPrint('Sending print job to printer...');
-      final printResult = await printerInstance.printImage(image);
+      final printResult = await printerInstance.printImage(image).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Print operation timeout after 30 seconds');
+        },
+      );
 
       debugPrint('Print result errorCode: ${printResult.errorCode.getName()}');
 
@@ -997,6 +1002,7 @@ class PrinterService {
       return false;
     }
 
+    ui.Image? image;
     try {
       // Build a small placeholder image as test content
       final recorder = ui.PictureRecorder();
@@ -1008,7 +1014,7 @@ class PrinterService {
 
       final textPainter = painting.TextPainter(
         text: painting.TextSpan(
-          text: 'Test print\nPlease verify paper type & alignment',
+          text: 'Test print\n Paper type verification successful.',
           style: painting.TextStyle(color: ui.Color(0xFF000000), fontSize: 18),
         ),
         textDirection: ui.TextDirection.ltr,
@@ -1017,17 +1023,27 @@ class PrinterService {
       textPainter.paint(canvas, ui.Offset(20, 20));
 
       final picture = recorder.endRecording();
-      final image = await picture.toImage(width.toInt(), height.toInt());
+      image = await picture.toImage(width.toInt(), height.toInt());
 
-      return await _printMobile(
+      final result = await _printMobile(
         image,
         onStatusUpdate: (progress) {
           debugPrint('Test print status: ${progress.message}');
         },
       );
-    } catch (e) {
+
+      // Dispose image to free resources
+      image.dispose();
+
+      return result;
+    } catch (e, stackTrace) {
       errorMessage = 'Test print failed: $e';
       debugPrint(errorMessage);
+      debugPrint('Stack trace: $stackTrace');
+
+      // Ensure image is disposed even if error occurs
+      image?.dispose();
+
       return false;
     }
   }

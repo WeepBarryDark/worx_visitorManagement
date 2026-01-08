@@ -66,6 +66,7 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
   String? _manualInputError;
   PaperType? _selectedPaperType;
   bool _isLoadingPaperType = true;
+  bool _isPrinting = false; // Prevent concurrent print operations
 
   @override
   void initState() {
@@ -111,6 +112,9 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
     setState(() {
       _selectedPaperType = paperType;
     });
+
+    // Reset test print flag when paper type changes
+    widget.controller.resetTestPrintFlag();
 
     if (!mounted || !showFeedback) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -584,9 +588,26 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                   ],
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: () async {
+                    onPressed: (_isPrinting || widget.controller.hasTestPrinted) ? null : () async {
+                      // Prevent concurrent print operations
+                      if (_isPrinting) return;
+
+                      // Check if test print has already been done FIRST
+                      if (widget.controller.hasTestPrinted) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Test print already done. Change paper type to print again.'),
+                            backgroundColor: Colors.orange,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                        return;
+                      }
+
                       if (!widget.controller.initialized ||
                           widget.controller.printerService.selectedPrinter == null) {
+                        if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Connect a printer before running a test print.'),
@@ -596,7 +617,17 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                         return;
                       }
 
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      // Set printing flag
+                      setState(() {
+                        _isPrinting = true;
+                      });
+
+                      if (!mounted) return;
+
+                      // Get ScaffoldMessenger before async gap
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                      scaffoldMessenger.showSnackBar(
                         SnackBar(
                           content: const Text('Sending test print...'),
                           backgroundColor: AppTheme.primaryBlue,
@@ -606,27 +637,88 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
 
                       try {
                         final ok = await widget.controller.printerService.printTestLabel();
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                        ScaffoldMessenger.of(context).showSnackBar(
+
+                        if (!mounted) return;
+                        scaffoldMessenger.hideCurrentSnackBar();
+                        scaffoldMessenger.showSnackBar(
                           SnackBar(
                             content: Text(ok ? 'Test print sent successfully.' : 'Test print failed.'),
                             backgroundColor: ok ? AppTheme.successColor : Colors.red,
                           ),
                         );
+
+                        // Mark test print as done regardless of success or failure
+                        // User must change paper type to print again
+                        if (mounted) {
+                          widget.controller.markTestPrinted();
+                        }
                       } catch (e) {
-                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        if (!mounted) return;
+                        scaffoldMessenger.hideCurrentSnackBar();
+                        scaffoldMessenger.showSnackBar(
                           SnackBar(
                             content: Text('Test print error: $e'),
                             backgroundColor: Colors.red,
                           ),
                         );
+
+                        // Mark test print as done even on error
+                        // User must change paper type to try again
+                        if (mounted) {
+                          widget.controller.markTestPrinted();
+                        }
+                      } finally {
+                        // Always reset printing flag
+                        if (mounted) {
+                          setState(() {
+                            _isPrinting = false;
+                          });
+                        }
                       }
                     },
-                    icon: const Icon(Icons.print),
-                    label: const Text('Run Test Print'),
+                    icon: _isPrinting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.print),
+                    label: Text(_isPrinting ? 'Printing...' : 'Run Test Print'),
                   ),
+                  // Show hint when test print is disabled
+                  if (widget.controller.hasTestPrinted) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 16,
+                            color: Colors.orange.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Test print completed. Change paper type to run test print again.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.orange.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (_selectedPaperType != null) ...[
                     const SizedBox(height: 8),
                     Container(

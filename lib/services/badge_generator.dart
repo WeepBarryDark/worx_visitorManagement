@@ -272,6 +272,11 @@ class BadgeGenerator {
       yPosition = _drawField(canvas, 'Sign In', data.signInTime!, yPosition);
     }
 
+    // Show photo uploaded indicator if visitor photo was captured
+    if (data.visitorPhotoBytes != null) {
+      yPosition = _drawField(canvas, 'Photo', 'Photo Uploaded', yPosition);
+    }
+
     // Add some spacing before QR code
     yPosition += 40;
 

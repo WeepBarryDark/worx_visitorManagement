@@ -232,6 +232,7 @@ class ApiService {
     String? workType,
     String? supervisor,
     String? signInTime,
+    Map<String, String>? visitorPhotos,  // Map of visitor ID to base64 photo
   }) async {
     try {
       // Required fields
@@ -261,6 +262,10 @@ class ApiService {
       }
       if (signInTime != null && signInTime.isNotEmpty) {
         payload['sign_in_time'] = signInTime;
+      }
+      if (visitorPhotos != null && visitorPhotos.isNotEmpty) {
+        // Add photos with visitor ID as key
+        payload['visitor_photos'] = visitorPhotos;
       }
 
       //debugPrint('📤 Submitting sign-in ledger:--------------------------------');

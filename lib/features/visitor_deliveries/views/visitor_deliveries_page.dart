@@ -341,7 +341,6 @@ class _VisitorDeliveriesPage extends State<VisitorDeliveriesPage> {
         );
 
         if (siteSupervisor == null) {
-          //print('⚠️ No supervisor found for site: $siteName');
           notificationStatus = const _NotificationStatus();
         } else {
           debugPrint(

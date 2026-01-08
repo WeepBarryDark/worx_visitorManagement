@@ -145,6 +145,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
     try {
       final XFile? photo = await _imagePicker.pickImage(
         source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
         maxWidth: 800,
         maxHeight: 800,
         imageQuality: 85,
@@ -313,8 +314,19 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
         throw Exception('No auth token found');
       }
 
+      // Generate temporary visitor ID for photo key (will be replaced by server's ID)
+      final tempVisitorId = 'VIS${DateTime.now().millisecondsSinceEpoch}';
+
       // Format the "agree" data
       final Map<String, dynamic> agreeData = _formatAgreeData();
+
+      // Prepare photos payload with visitor ID as key
+      Map<String, String>? photosPayload;
+      if (_visitorPhotoBytes != null) {
+        photosPayload = {
+          tempVisitorId: base64Encode(_visitorPhotoBytes!),
+        };
+      }
 
       final response = await ApiService.submitSignInLedger(
         token: token,
@@ -340,6 +352,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
             ? _selectedContactDetail!.name
             : null,
         signInTime: c.reqSignInTime ? _signInTimeDisplay : null,
+        visitorPhotos: photosPayload,
       );
 
       debugPrint('Sign in successfully in site!');
@@ -667,8 +680,6 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
 
     try {
       final response = await ApiService.fetchSiteQuestions(token, siteId);
-      //debugPrint("site question--------------------123");
-      //print(response);
 
       final payload = _extractQuestionList(response);
       if (payload.isEmpty) {

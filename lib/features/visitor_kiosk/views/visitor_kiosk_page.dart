@@ -188,6 +188,25 @@ class _VisitorDashboardState extends State<VisitorDashboard> {
                               ),
                             ),
                           ),
+                          const SizedBox(height: 14),
+
+                          // Re-print Badge button
+                          FilledButton.icon(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              AppRoutes.reprintBadge,
+                              arguments: c,
+                            ),
+                            icon: const Icon(Icons.badge, size: 22),
+                            label: const Text('Re-print Badge'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 56),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),

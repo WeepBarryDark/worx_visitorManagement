@@ -15,6 +15,7 @@ class _QRScannerWidgetState extends State<QRScannerWidget> {
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: const [BarcodeFormat.qrCode],
+    facing: CameraFacing.front,
   );
 
   bool _hasScanned = false;
