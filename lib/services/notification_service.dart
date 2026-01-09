@@ -173,6 +173,7 @@ class NotificationService {
     String? phone,
     required String message,
     String? logoUrl,
+    String? visitorPhoto,  // Base64 encoded visitor photo
   }) async {
     try {
       final authToken = await SecureStorageService.getAuthToken();
@@ -189,7 +190,8 @@ class NotificationService {
         'Email Address: ${email ?? "(empty)"} | '
         'Phone Number: ${phone ?? "(empty)"} | '
         'Message Length: ${message.length} chars | '
-        'Logo URL: ${logoUrl ?? "(none)"}'
+        'Logo URL: ${logoUrl ?? "(none)"} | '
+        'Visitor Photo: ${visitorPhoto != null ? "Included" : "(none)"}'
       );
       */
 
@@ -201,6 +203,7 @@ class NotificationService {
         phone: phone,
         message: message,
         logoUrl: logoUrl,
+        visitorPhoto: visitorPhoto,
       );
       debugPrint('Email Response: Success: $success ');
       return success;

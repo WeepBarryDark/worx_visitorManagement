@@ -646,7 +646,13 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
         'Email Body: ${email['body'] ?? ""}'
       );
       */
-      // Send actual email via API with logo URL
+      // Prepare visitor photo if available
+      String? visitorPhotoBase64;
+      if (badgeData.visitorPhotoBytes != null) {
+        visitorPhotoBase64 = base64Encode(badgeData.visitorPhotoBytes!);
+      }
+
+      // Send actual email via API with logo URL and visitor photo
       emailSuccess = await NotificationService.sendEmail(
         userId: contact.id,
         name: badgeData.fullName ?? 'Visitor',
@@ -654,6 +660,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
         phone: contact.phone,
         message: email['body'] ?? '',
         logoUrl: logoUrl,
+        visitorPhoto: visitorPhotoBase64,
       );
       debugPrint(emailSuccess ? "SUCCESS" : "FAILED");
     }

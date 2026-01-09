@@ -4,7 +4,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
 
 /// Secure Storage Service for sensitive data like auth tokens
+/// Provides encrypted storage for authentication, user data, app settings, and visitor management
 class SecureStorageService {
+  // ============================================================================
+  // CONFIGURATION & STORAGE INSTANCE
+  // ============================================================================
+
   static const _storage = FlutterSecureStorage(
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock,
@@ -15,30 +20,48 @@ class SecureStorageService {
     ),
   );
 
-  // Storage keys
+  // ============================================================================
+  // STORAGE KEYS
+  // ============================================================================
+
+  // Authentication keys
   static const String _keyAuthToken = 'auth_token';
   static const String _keyRefreshToken = 'refresh_token';
   static const String _keyDeviceName = 'device_name';
   static const String _keySetupCode = 'setup_code';
+
+  // User data keys
   static const String _keyUserId = 'user_id';
   static const String _keyUserEmail = 'user_email';
+
+  // App data keys
   static const String _keySites = 'visitor_sites';
   static const String _keyContacts = 'visitor_contacts';
   static const String _keyClient = 'visitor_client';
-  static const String _keySignedVisitors = 'signed_visitors';
-  static const String _keyKioskAdminPin = 'kiosk_admin_pin';
   static const String _keySelectedSite = 'selected_site';
+
+  // Visitor management keys
+  static const String _keySignedVisitors = 'signed_visitors';
+
+  // Settings keys
+  static const String _keyKioskAdminPin = 'kiosk_admin_pin';
   static const String _keyNotificationPreferences = 'notification_preferences';
-  static const String _keyLastPrinter = 'last_printer'; // Store last discovered printer info
-  static const String _keyPaperType = 'printer_paper_type'; // Store selected paper type
-  static const String _keyVisitorRequirements = 'visitor_requirements'; // Store required visitor fields
-  static const String _keyPrintSettings = 'print_settings'; // Store print-related settings
-  static const String _keyAutoNavigateToKiosk = 'auto_navigate_to_kiosk'; // Flag to auto-navigate to kiosk after dashboard loads
+  static const String _keyVisitorRequirements = 'visitor_requirements';
+  static const String _keyAutoNavigateToKiosk = 'auto_navigate_to_kiosk';
+
+  // Printer & print settings keys
+  static const String _keyLastPrinter = 'last_printer';
+  static const String _keyPaperType = 'printer_paper_type';
+  static const String _keyPrintSettings = 'print_settings';
 
   // Data fetch failure tracking keys
   static const String _keyFetchFailureSites = 'fetch_failure_sites';
   static const String _keyFetchFailureContacts = 'fetch_failure_contacts';
   static const String _keyFetchFailureClient = 'fetch_failure_client';
+
+  // ============================================================================
+  // AUTHENTICATION
+  // ============================================================================
 
   /// Save authentication token
   static Future<void> saveAuthToken(String token) async {
@@ -46,7 +69,7 @@ class SecureStorageService {
       await _storage.write(key: _keyAuthToken, value: token);
       debugPrint('Auth token saved securely');
     } catch (e) {
-      debugPrint('Error reading auth token: $e');
+      debugPrint('Error saving auth token: $e');
       rethrow;
     }
   }
@@ -119,6 +142,54 @@ class SecureStorageService {
     }
   }
 
+  /// Check if user is authenticated (has valid token)
+  static Future<bool> isAuthenticated() async {
+    final token = await getAuthToken();
+    return token != null && token.isNotEmpty;
+  }
+
+  /// Save all authentication data at once
+  static Future<void> saveAuthData({
+    required String authToken,
+    String? refreshToken,
+    String? deviceName,
+    String? setupCode,
+    String? userId,
+    String? userEmail,
+  }) async {
+    await saveAuthToken(authToken);
+    if (refreshToken != null) await saveRefreshToken(refreshToken);
+    if (deviceName != null) await saveDeviceName(deviceName);
+    if (setupCode != null) await saveSetupCode(setupCode);
+    if (userId != null) await saveUserId(userId);
+    if (userEmail != null) await saveUserEmail(userEmail);
+    debugPrint('All auth data saved');
+  }
+
+  /// Clear all authentication data (logout)
+  /// Keeps device name and setup code for easier re-authentication
+  static Future<void> clearAuthData() async {
+    try {
+      await Future.wait([
+        _storage.delete(key: _keyAuthToken),
+        _storage.delete(key: _keyRefreshToken),
+        _storage.delete(key: _keyUserId),
+        _storage.delete(key: _keyUserEmail),
+        _storage.delete(key: _keySignedVisitors),
+        _storage.delete(key: _keySites),
+        _storage.delete(key: _keyContacts),
+        _storage.delete(key: _keyClient),
+      ]);
+    } catch (e) {
+      debugPrint('Error clearing auth data: $e');
+      rethrow;
+    }
+  }
+
+  // ============================================================================
+  // USER DATA
+  // ============================================================================
+
   /// Save user ID
   static Future<void> saveUserId(String userId) async {
     try {
@@ -157,22 +228,20 @@ class SecureStorageService {
     }
   }
 
-  /// Check if user is authenticated (has valid token)
-  static Future<bool> isAuthenticated() async {
-    final token = await getAuthToken();
-    return token != null && token.isNotEmpty;
-  }
+  // ============================================================================
+  // APP DATA (Sites, Contacts, Client)
+  // ============================================================================
 
-  /// Save visitor sites data
+  /// Save visitor sites data (JSON string)
   static Future<void> saveSites(String sitesJson) async {
     try {
       await _storage.write(key: _keySites, value: sitesJson);
     } catch (e) {
-       debugPrint('Error saving sites: $e');
+      debugPrint('Error saving sites: $e');
     }
   }
 
-  /// Get visitor sites data
+  /// Get visitor sites data (JSON string)
   static Future<String?> getSites() async {
     try {
       return await _storage.read(key: _keySites);
@@ -182,7 +251,7 @@ class SecureStorageService {
     }
   }
 
-  /// Save visitor contacts data
+  /// Save visitor contacts data (JSON string)
   static Future<void> saveContacts(String contactsJson) async {
     try {
       await _storage.write(key: _keyContacts, value: contactsJson);
@@ -191,7 +260,7 @@ class SecureStorageService {
     }
   }
 
-  /// Get visitor contacts data
+  /// Get visitor contacts data (JSON string)
   static Future<String?> getContacts() async {
     try {
       return await _storage.read(key: _keyContacts);
@@ -201,7 +270,8 @@ class SecureStorageService {
     }
   }
 
-  /// Save visitor client data
+  /// Save visitor client data (JSON string)
+  /// Client data includes: logo, background_image, name, trading_name
   static Future<void> saveClient(String clientJson) async {
     try {
       await _storage.delete(key: _keyClient);
@@ -211,7 +281,7 @@ class SecureStorageService {
     }
   }
 
-  /// Get visitor client data
+  /// Get visitor client data (JSON string)
   static Future<String?> getClient() async {
     try {
       return await _storage.read(key: _keyClient);
@@ -221,7 +291,7 @@ class SecureStorageService {
     }
   }
 
-  /// Save selected site data
+  /// Save selected site data (JSON string)
   static Future<void> saveSelectedSite(String siteJson) async {
     try {
       await _storage.write(key: _keySelectedSite, value: siteJson);
@@ -230,7 +300,7 @@ class SecureStorageService {
     }
   }
 
-  /// Get selected site data
+  /// Get selected site data (JSON string)
   static Future<String?> getSelectedSite() async {
     try {
       return await _storage.read(key: _keySelectedSite);
@@ -240,85 +310,13 @@ class SecureStorageService {
     }
   }
 
-  /// Save notification preferences
-  static Future<void> saveNotificationPreferences(String preferencesJson) async {
-    try {
-      await _storage.write(key: _keyNotificationPreferences, value: preferencesJson);
-    } catch (e) {
-      debugPrint('Error saving notification preferences: $e');
-    }
-  }
+  // ============================================================================
+  // VISITOR MANAGEMENT
+  // ============================================================================
 
-  /// Get notification preferences
-  static Future<String?> getNotificationPreferences() async {
-    try {
-      return await _storage.read(key: _keyNotificationPreferences);
-    } catch (e) {
-      debugPrint('Error reading notification preferences: $e');
-      return null;
-    }
-  }
-
-  /// Save all authentication data at once
-  static Future<void> saveAuthData({
-    required String authToken,
-    String? refreshToken,
-    String? deviceName,
-    String? setupCode,
-    String? userId,
-    String? userEmail,
-  }) async {
-    await saveAuthToken(authToken);
-    if (refreshToken != null) await saveRefreshToken(refreshToken);
-    if (deviceName != null) await saveDeviceName(deviceName);
-    if (setupCode != null) await saveSetupCode(setupCode);
-    if (userId != null) await saveUserId(userId);
-    if (userEmail != null) await saveUserEmail(userEmail);
-    debugPrint('All auth data saved');
-  }
-
-  /// Clear all authentication data (logout)
-  static Future<void> clearAuthData() async {
-    try {
-      await Future.wait([
-        _storage.delete(key: _keyAuthToken),
-        _storage.delete(key: _keyRefreshToken),
-        _storage.delete(key: _keyUserId),
-        _storage.delete(key: _keyUserEmail),
-        _storage.delete(key: _keySignedVisitors),  // Clear visitor data on logout
-        _storage.delete(key: _keySites),           // Clear site data
-        _storage.delete(key: _keyContacts),        // Clear contacts
-        _storage.delete(key: _keyClient),          // Clear client data
-        // Keep device name and setup code for easier re-authentication
-      ]);
-
-    } catch (e) {
-      debugPrint('Error clearing auth data: $e');
-      rethrow;
-    }
-  }
-
-  /// Clear all stored data (complete reset)
-  static Future<void> clearAll() async {
-    try {
-      await _storage.deleteAll();
-    } catch (e) {
-      debugPrint('Error clearing storage: $e');
-      rethrow;
-    }
-  }
-
-  /// Get all stored keys (for debugging)
-  static Future<Map<String, String>> getAllData() async {
-    try {
-      return await _storage.readAll();
-    } catch (e) {
-      debugPrint('Error reading all data: $e');
-      return {};
-    }
-  }
-
-  /// Store signed-in visitor for quick lookup (used by sign-out autofill)
+  /// Add a signed-in visitor to local storage
+  /// Used for quick lookup during sign-out (autofill feature)
+  /// Stores up to 200 most recent visitors
   static Future<void> addSignedVisitor({
     required String visitorId,
     String? email,
@@ -355,6 +353,7 @@ class SecureStorageService {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
+      // Update existing record or insert new
       final existingIndex = records.indexWhere((entry) {
         if (entry is Map) {
           final id = entry['id']?.toString();
@@ -373,6 +372,7 @@ class SecureStorageService {
         records.insert(0, record);
       }
 
+      // Limit to 200 most recent visitors
       if (records.length > 200) {
         records = records.sublist(0, 200);
       }
@@ -382,7 +382,7 @@ class SecureStorageService {
         value: jsonEncode(records),
       );
     } catch (e) {
-      debugPrint('Error: $e tack trace: ${StackTrace.current} ');
+      debugPrint('Error adding signed visitor: $e');
     }
   }
 
@@ -411,18 +411,18 @@ class SecureStorageService {
         }
         return true;
       }).toList();
-      
+
       await _storage.write(
         key: _keySignedVisitors,
         value: jsonEncode(updatedRecords),
       );
-
     } catch (e) {
-      debugPrint('Error: $e Stack trace: ${StackTrace.current} ');
+      debugPrint('Error removing signed visitor: $e');
     }
   }
 
-  /// Return cached signed-in visitors
+  /// Get cached signed-in visitors
+  /// Returns list of visitor records with all stored fields
   static Future<List<Map<String, dynamic>>> getSignedVisitors() async {
     try {
       final raw = await _storage.read(key: _keySignedVisitors);
@@ -448,7 +448,11 @@ class SecureStorageService {
     }
   }
 
-  /// Save kiosk admin password (used to exit kiosk)
+  // ============================================================================
+  // SETTINGS (Admin PIN, Notifications, Requirements, Auto-Navigate)
+  // ============================================================================
+
+  /// Save kiosk admin PIN (used to exit kiosk mode)
   static Future<void> saveAdminPin(String pin) async {
     try {
       await _storage.write(key: _keyKioskAdminPin, value: pin);
@@ -459,7 +463,7 @@ class SecureStorageService {
     }
   }
 
-  /// Load kiosk admin password (defaults to 1234 if none stored)
+  /// Get kiosk admin PIN (defaults to '1234' if none stored)
   static Future<String> getAdminPin() async {
     try {
       final value = await _storage.read(key: _keyKioskAdminPin);
@@ -473,9 +477,214 @@ class SecureStorageService {
     }
   }
 
-  // ---------------------------------------------------------
-  // Data Fetch Failure Tracking
-  // ---------------------------------------------------------
+  /// Save notification preferences (JSON string)
+  static Future<void> saveNotificationPreferences(
+      String preferencesJson) async {
+    try {
+      await _storage.write(
+          key: _keyNotificationPreferences, value: preferencesJson);
+    } catch (e) {
+      debugPrint('Error saving notification preferences: $e');
+    }
+  }
+
+  /// Get notification preferences (JSON string)
+  static Future<String?> getNotificationPreferences() async {
+    try {
+      return await _storage.read(key: _keyNotificationPreferences);
+    } catch (e) {
+      debugPrint('Error reading notification preferences: $e');
+      return null;
+    }
+  }
+
+  /// Save visitor field requirements (JSON string)
+  /// Stores which fields are required during visitor sign-in
+  static Future<void> saveVisitorRequirements(String requirementsJson) async {
+    try {
+      await _storage.write(
+        key: _keyVisitorRequirements,
+        value: requirementsJson,
+      );
+      debugPrint('Visitor requirements saved');
+    } catch (e) {
+      debugPrint('Error saving visitor requirements: $e');
+    }
+  }
+
+  /// Get visitor field requirements (JSON string)
+  static Future<String?> getVisitorRequirements() async {
+    try {
+      return await _storage.read(key: _keyVisitorRequirements);
+    } catch (e) {
+      debugPrint('Error reading visitor requirements: $e');
+      return null;
+    }
+  }
+
+  /// Clear visitor requirements
+  static Future<void> clearVisitorRequirements() async {
+    try {
+      await _storage.delete(key: _keyVisitorRequirements);
+    } catch (e) {
+      debugPrint('Error clearing visitor requirements: $e');
+    }
+  }
+
+  /// Save auto-navigate to kiosk flag
+  /// When true, app will automatically navigate to kiosk after dashboard loads
+  static Future<void> saveAutoNavigateToKiosk(bool shouldNavigate) async {
+    try {
+      await _storage.write(
+        key: _keyAutoNavigateToKiosk,
+        value: shouldNavigate.toString(),
+      );
+      debugPrint('Auto-navigate to kiosk flag saved: $shouldNavigate');
+    } catch (e) {
+      debugPrint('Error saving auto-navigate flag: $e');
+    }
+  }
+
+  /// Get auto-navigate to kiosk flag
+  static Future<bool> getAutoNavigateToKiosk() async {
+    try {
+      final value = await _storage.read(key: _keyAutoNavigateToKiosk);
+      return value == 'true';
+    } catch (e) {
+      debugPrint('Error reading auto-navigate flag: $e');
+      return false;
+    }
+  }
+
+  /// Clear auto-navigate to kiosk flag
+  static Future<void> clearAutoNavigateToKiosk() async {
+    try {
+      await _storage.delete(key: _keyAutoNavigateToKiosk);
+      debugPrint('Auto-navigate to kiosk flag cleared');
+    } catch (e) {
+      debugPrint('Error clearing auto-navigate flag: $e');
+    }
+  }
+
+  // ============================================================================
+  // PRINTER & PRINT SETTINGS
+  // ============================================================================
+
+  /// Save last successfully discovered printer information
+  /// Allows quick reconnection without network scanning
+  /// Stores: {name, address, model, saved_at}
+  static Future<void> saveLastPrinter({
+    required String name,
+    required String address,
+    required String model,
+  }) async {
+    try {
+      final printerData = jsonEncode({
+        'name': name,
+        'address': address,
+        'model': model,
+        'saved_at': DateTime.now().toIso8601String(),
+      });
+      await _storage.write(key: _keyLastPrinter, value: printerData);
+    } catch (e) {
+      debugPrint('Error saving printer info: $e');
+    }
+  }
+
+  /// Get last successfully discovered printer information
+  /// Returns Map with keys: name, address, model, saved_at
+  /// Returns null if no printer info saved
+  static Future<Map<String, dynamic>?> getLastPrinter() async {
+    try {
+      final printerJson = await _storage.read(key: _keyLastPrinter);
+      if (printerJson == null || printerJson.isEmpty) {
+        return null;
+      }
+      final printerData = jsonDecode(printerJson) as Map<String, dynamic>;
+      return printerData;
+    } catch (e) {
+      debugPrint('Error reading printer info: $e');
+      return null;
+    }
+  }
+
+  /// Clear saved printer information
+  static Future<void> clearLastPrinter() async {
+    try {
+      await _storage.delete(key: _keyLastPrinter);
+    } catch (e) {
+      debugPrint('Error clearing printer info: $e');
+    }
+  }
+
+  /// Save selected paper type for printing (JSON string)
+  static Future<void> savePaperType(String paperTypeJson) async {
+    try {
+      await _storage.write(
+        key: _keyPaperType,
+        value: paperTypeJson,
+      );
+      debugPrint('Paper type saved: $paperTypeJson');
+    } catch (e) {
+      debugPrint('Error saving paper type: $e');
+    }
+  }
+
+  /// Get saved paper type (JSON string)
+  static Future<String?> getPaperType() async {
+    try {
+      return await _storage.read(key: _keyPaperType);
+    } catch (e) {
+      debugPrint('Error reading paper type: $e');
+      return null;
+    }
+  }
+
+  /// Clear saved paper type
+  static Future<void> clearPaperType() async {
+    try {
+      await _storage.delete(key: _keyPaperType);
+    } catch (e) {
+      debugPrint('Error clearing paper type: $e');
+    }
+  }
+
+  /// Save print-related settings (JSON string)
+  /// Includes: automatic badge printing, etc.
+  static Future<void> savePrintSettings(String settingsJson) async {
+    try {
+      await _storage.write(
+        key: _keyPrintSettings,
+        value: settingsJson,
+      );
+      debugPrint('Print settings saved');
+    } catch (e) {
+      debugPrint('Error saving print settings: $e');
+    }
+  }
+
+  /// Get saved print settings (JSON string)
+  static Future<String?> getPrintSettings() async {
+    try {
+      return await _storage.read(key: _keyPrintSettings);
+    } catch (e) {
+      debugPrint('Error reading print settings: $e');
+      return null;
+    }
+  }
+
+  /// Clear saved print settings
+  static Future<void> clearPrintSettings() async {
+    try {
+      await _storage.delete(key: _keyPrintSettings);
+    } catch (e) {
+      debugPrint('Error clearing print settings: $e');
+    }
+  }
+
+  // ============================================================================
+  // DATA FETCH FAILURE TRACKING
+  // ============================================================================
 
   /// Mark sites data fetch as failed
   static Future<void> markSitesFailure(String errorMessage) async {
@@ -549,10 +758,13 @@ class SecureStorageService {
     final sitesFailure = await getSitesFailure();
     final contactsFailure = await getContactsFailure();
     final clientFailure = await getClientFailure();
-    return sitesFailure != null || contactsFailure != null || clientFailure != null;
+    return sitesFailure != null ||
+        contactsFailure != null ||
+        clientFailure != null;
   }
 
   /// Get all fetch failures as a map
+  /// Returns: {resource_name: error_message}
   static Future<Map<String, String>> getAllFetchFailures() async {
     final failures = <String, String>{};
 
@@ -574,195 +786,28 @@ class SecureStorageService {
     return failures;
   }
 
-  // ========== PRINTER INFO STORAGE ==========
+  // ============================================================================
+  // UTILITY FUNCTIONS
+  // ============================================================================
 
-  /// Save last successfully discovered printer information
-  /// This allows quick reconnection without network scanning
-  static Future<void> saveLastPrinter({
-    required String name,
-    required String address,
-    required String model,
-  }) async {
+  /// Get all stored keys and values (for debugging)
+  static Future<Map<String, String>> getAllData() async {
     try {
-      final printerData = jsonEncode({
-        'name': name,
-        'address': address,
-        'model': model,
-        'saved_at': DateTime.now().toIso8601String(),
-      });
-      await _storage.write(key: _keyLastPrinter, value: printerData);
+      return await _storage.readAll();
     } catch (e) {
-      debugPrint('Error saving printer info: $e');
+      debugPrint('Error reading all data: $e');
+      return {};
     }
   }
 
-  /// Get last successfully discovered printer information
-  /// Returns Map with keys: name, address, model, saved_at
-  /// Returns null if no printer info saved
-  static Future<Map<String, dynamic>?> getLastPrinter() async {
+  /// Clear all stored data (complete reset)
+  /// WARNING: This will delete everything including setup code
+  static Future<void> clearAll() async {
     try {
-      final printerJson = await _storage.read(key: _keyLastPrinter);
-      if (printerJson == null || printerJson.isEmpty) {
-        return null;
-      }
-      final printerData = jsonDecode(printerJson) as Map<String, dynamic>;
-      return printerData;
+      await _storage.deleteAll();
     } catch (e) {
-      debugPrint('Error reading printer info: $e');
-      return null;
-    }
-  }
-
-  /// Clear saved printer information
-  static Future<void> clearLastPrinter() async {
-    try {
-      await _storage.delete(key: _keyLastPrinter);
-    } catch (e) {
-      debugPrint('Error clearing printer info: $e');
-    }
-  }
-
-  // ========== PAPER TYPE STORAGE ==========
-
-  /// Save selected paper type for printing
-  /// Stores the full paper type configuration as JSON
-  static Future<void> savePaperType(String paperTypeJson) async {
-    try {
-      await _storage.write(
-        key: _keyPaperType,
-        value: paperTypeJson,
-      );
-      debugPrint('Paper type saved: $paperTypeJson');
-    } catch (e) {
-      debugPrint('Error saving paper type: $e');
-    }
-  }
-
-  /// Get saved paper type
-  /// Returns paper type JSON string, or null if not set
-  static Future<String?> getPaperType() async {
-    try {
-      return await _storage.read(key: _keyPaperType);
-    } catch (e) {
-      debugPrint('Error reading paper type: $e');
-      return null;
-    }
-  }
-
-  /// Clear saved paper type
-  static Future<void> clearPaperType() async {
-    try {
-      await _storage.delete(key: _keyPaperType);
-    } catch (e) {
-      debugPrint('Error clearing paper type: $e');
-    }
-  }
-
-  // ========== VISITOR REQUIREMENTS STORAGE ==========
-
-  /// Save visitor field requirements
-  /// Stores which fields are required during visitor sign-in
-  static Future<void> saveVisitorRequirements(String requirementsJson) async {
-    try {
-      await _storage.write(
-        key: _keyVisitorRequirements,
-        value: requirementsJson,
-      );
-      debugPrint('Visitor requirements saved');
-    } catch (e) {
-      debugPrint('Error saving visitor requirements: $e');
-    }
-  }
-
-  /// Get saved visitor field requirements
-  /// Returns requirements JSON string, or null if not set
-  static Future<String?> getVisitorRequirements() async {
-    try {
-      return await _storage.read(key: _keyVisitorRequirements);
-    } catch (e) {
-      debugPrint('Error reading visitor requirements: $e');
-      return null;
-    }
-  }
-
-  /// Clear saved visitor requirements
-  static Future<void> clearVisitorRequirements() async {
-    try {
-      await _storage.delete(key: _keyVisitorRequirements);
-    } catch (e) {
-      debugPrint('Error clearing visitor requirements: $e');
-    }
-  }
-
-  // ========== PRINT SETTINGS STORAGE ==========
-
-  /// Save print-related settings
-  /// Stores settings like automatic badge printing
-  static Future<void> savePrintSettings(String settingsJson) async {
-    try {
-      await _storage.write(
-        key: _keyPrintSettings,
-        value: settingsJson,
-      );
-      debugPrint('Print settings saved');
-    } catch (e) {
-      debugPrint('Error saving print settings: $e');
-    }
-  }
-
-  /// Get saved print settings
-  /// Returns settings JSON string, or null if not set
-  static Future<String?> getPrintSettings() async {
-    try {
-      return await _storage.read(key: _keyPrintSettings);
-    } catch (e) {
-      debugPrint('Error reading print settings: $e');
-      return null;
-    }
-  }
-
-  /// Clear saved print settings
-  static Future<void> clearPrintSettings() async {
-    try {
-      await _storage.delete(key: _keyPrintSettings);
-    } catch (e) {
-      debugPrint('Error clearing print settings: $e');
-    }
-  }
-
-  // ========== AUTO-NAVIGATE TO KIOSK FLAG ==========
-
-  /// Save flag to auto-navigate to kiosk after dashboard loads
-  static Future<void> saveAutoNavigateToKiosk(bool shouldNavigate) async {
-    try {
-      await _storage.write(
-        key: _keyAutoNavigateToKiosk,
-        value: shouldNavigate.toString(),
-      );
-      debugPrint('Auto-navigate to kiosk flag saved: $shouldNavigate');
-    } catch (e) {
-      debugPrint('Error saving auto-navigate flag: $e');
-    }
-  }
-
-  /// Get auto-navigate to kiosk flag
-  static Future<bool> getAutoNavigateToKiosk() async {
-    try {
-      final value = await _storage.read(key: _keyAutoNavigateToKiosk);
-      return value == 'true';
-    } catch (e) {
-      debugPrint('Error reading auto-navigate flag: $e');
-      return false;
-    }
-  }
-
-  /// Clear auto-navigate to kiosk flag
-  static Future<void> clearAutoNavigateToKiosk() async {
-    try {
-      await _storage.delete(key: _keyAutoNavigateToKiosk);
-      debugPrint('Auto-navigate to kiosk flag cleared');
-    } catch (e) {
-      debugPrint('Error clearing auto-navigate flag: $e');
+      debugPrint('Error clearing storage: $e');
+      rethrow;
     }
   }
 }

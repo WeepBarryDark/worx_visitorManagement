@@ -2,43 +2,56 @@ class ServerLink {
   static const String mainServerURL = 'https://app.worxsafety.com.au';
 
   //URL Link list
-  static const String newSessionURL = '${ServerLink.mainServerURL}/qr-login/';  // + {uuid} - Generate uuid session token
-  static const String authenticateURL = '${ServerLink.mainServerURL}/api/authenticate_app';  // payload {tablet_setup_code,device_name} - post to server with token for log in
+  static const String newSessionURL = '${ServerLink.mainServerURL}/qr-login/';  // + {uuid} - Generate uuid session token - scan with phone to create session
+  static const String authenticateURL = '${ServerLink.mainServerURL}/api/authenticate_app';  // post - payload {tablet_setup_code,device_name} - post to server with token for log in
 
-  static const String fetchVisitorSites = '${ServerLink.mainServerURL}/api/visitor/sites'; // get sites payload {token}
-  static const String fetchVisitorContacts = '${ServerLink.mainServerURL}/api/visitor/contacts'; // get contacts  payload {token}
-  static const String fetchVisitorClient = '${ServerLink.mainServerURL}/api/visitor/client'; // get clients payload {token}
+  static const String fetchVisitorSites = '${ServerLink.mainServerURL}/api/visitor/sites'; // get sites  {token}
+  static const String fetchVisitorContacts = '${ServerLink.mainServerURL}/api/visitor/contacts'; // get contacts  {token}
+  static const String fetchVisitorClient = '${ServerLink.mainServerURL}/api/visitor/client'; // get clients  {token}
 
-  static const String fetchVisitorQuestions = '${ServerLink.mainServerURL}/api/visitor/site_questions'; // post  {"site_id": }
-  static const String sendSMS = '${ServerLink.mainServerURL}/api/visitor/send_sms'; // post {"user_id": "23", "mobile":"0422502693","message": "this is a test message"}
-  static const String sendEmail = '${ServerLink.mainServerURL}/api/visitor/send_email'; // post {"user_id" ： 23， "name":"fullname", "email":"required email", "phone":"text", "message":"text"}
+  static const String fetchVisitorQuestions = '${ServerLink.mainServerURL}/api/visitor/site_questions'; // post  {token}{"site_id": }
+  static const String sendSMS = '${ServerLink.mainServerURL}/api/visitor/send_sms'; // post {token}{"user_id": "23", "mobile":"0422502693","message": "this is a test message"}
+  static const String sendEmail = '${ServerLink.mainServerURL}/api/visitor/send_email'; // post {token}{"user_id" ： 23， "name":"fullname", "email":"required email", "phone":"text", "message":"text"}
 
-  // post {"!site_id":"",!"name":"","!email":"","organisation":"","phone":"","!questions":"{reference to bottom}"}
-  ///questions
-  static const String pushVisitorSignInLedge = '${ServerLink.mainServerURL}/api/visitor/sign_in';
+  static const String pushVisitorSignOutLedge = '${ServerLink.mainServerURL}/api/visitor/sign_out'; // post {token}{"visitor_id":"23"}
+  static const String revokeVisitorToken = '${ServerLink.mainServerURL}/api/visitor/revoke'; // post {token}{'device_name': finalDeviceName},
+
+  //Continue------------------------------------------------
+  static const String pushVisitorSignInLedge = '${ServerLink.mainServerURL}/api/visitor/sign_in'; //post -push kiosk signed-in visitor to server
+  // post {token}{"site_id":"","name":"","email":"","organisation?":"","phone?":"","questions":"{reference to bottom}","visitor_photo"："base64 code"} -> example at below
+  // add new feature visitor_photo for feature 10
   //sign in responses:
   ///success: 'messsage' => 'Login Complete',  'visitor_id' => $uniqueId
   ///error: 'message' => 'Evacuate'
   ///error: 'error' => 'Signed In already'
-  static const String pushVisitorSignOutLedge = '${ServerLink.mainServerURL}/api/visitor/sign_out'; // post {"visitor_id":"23"}
-  static const String revokeVisitorToken = '${ServerLink.mainServerURL}/api/visitor/revoke'; // post header only
+  
+  static const String fetchSignedInvisitor = '${ServerLink.mainServerURL}/api/visitor/signed_in_visitor'; // post - {token}{"site_id": } for feature 2
+  static const String fetchUserQrLink = '${ServerLink.mainServerURL}/api/user/sign_in_link'; // post - {token}{"site_id": } for feature 5 - return slug included link
+  
+  static const String pushDeliveryInLedge = '${ServerLink.mainServerURL}/api/delivery'; // post - {token}{"deliveryCompany":"","notificationSent":"" } for feature 6 
+
 }
 
 //--------------------------Sign in Question Format------------------------------------------
-/* default questions: 
+
+/* 
+Logic: if it is default question - return 1. default quest, otherwise, it is the customized question - return 2. customized sign in question
+//-----------------------------
+default questions: 
 I have been advised of the required minimum PPE for this site. 
 
 Observe all safety signage, read and follow site rules & instructions of the Site Supervisor. 
 
 Not smoke on site except in Designated Areas. 
 
-Be escorted by an authorised Pink Batteries representative at all times. 
+Be escorted by an authorised {$clientName}  representative at all times. 
 
-In the event of fire or emergency evacuation, follow the instructions of Pink Batteries representative. 
+In the event of fire or emergency evacuation, follow the instructions of {$clientName} representative. 
 
 Report any incidents / accident immediately.
+//----------------------------------
 
-default form:
+1. default quest:
 {
   "name": "Travis McLean ",
   "email": "travis.mclean@newheightsplumbing.com.au",
@@ -58,7 +71,7 @@ default form:
 */
 
 /*
-customized sign in question
+2. customized sign in question
 {
   "name": "Jake G Harris",
   "email": "jakeh@harleydykstra.com.au",
