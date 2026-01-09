@@ -1514,7 +1514,7 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(
                             maxWidth: 300,
-                            maxHeight: 450,
+                            maxHeight: 800,
                           ),
                           child: RawImage(
                             image: widget.badgeImage,

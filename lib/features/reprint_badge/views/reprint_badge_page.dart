@@ -555,7 +555,7 @@ class _ReprintBadgePageState extends State<ReprintBadgePage> {
                       ),
                       const SizedBox(height: 12),
                       Container(
-                        constraints: const BoxConstraints(maxHeight: 400),
+                        constraints: const BoxConstraints(maxHeight: 800),
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.grey.shade200),
                           borderRadius: BorderRadius.circular(8),

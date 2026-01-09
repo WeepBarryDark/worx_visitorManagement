@@ -924,7 +924,7 @@ class PrinterService {
         debugPrint('  errorCode: ${currentStatus.errorCode.getName()}');
         debugPrint('  labelId: ${currentStatus.labelId}');
         debugPrint('  labelType: ${currentStatus.labelType}');
-        debugPrint('  labelColor: ${currentStatus.labelColor?.getName()}');
+        debugPrint('  labelColor: ${currentStatus.labelColor.getName()}');
       } catch (e) {
         debugPrint('Could not get current status: $e');
       }
