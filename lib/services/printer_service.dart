@@ -164,25 +164,32 @@ class PrinterService {
       }
     }
     // Phase 2: Full subnet scan
+    debugPrint('📍 Phase 2: Scanning remaining IPs...');
 
     const fullScanBatchSize = 30;
     final allHosts = List.generate(254, (i) => i + 1)
         .where((host) => !priorityIPs.contains(host))
         .toList();
 
+    int scannedCount = priorityIPs.length;
     for (int i = 0; i < allHosts.length; i += fullScanBatchSize) {
       final batch = allHosts.skip(i).take(fullScanBatchSize);
       final batchFutures = batch.map((host) => _checkPrinterAtAddress('$subnet.$host'));
 
       await Future.wait(batchFutures);
+      scannedCount += batch.length;
 
       if (discoveredPrinters.isNotEmpty) {
-        debugPrint('Found printer, stopping scan');
+        debugPrint('✓ Found printer at ${discoveredPrinters.first.address} (scanned $scannedCount IPs)');
         return;
       }
 
+      // Show progress every 60 IPs
+      if (scannedCount % 60 == 0) {
+        debugPrint('   ... scanned $scannedCount/${priorityIPs.length + allHosts.length} IPs');
+      }
     }
-    debugPrint('Scan complete - checked ${priorityIPs.length + allHosts.length} IPs');
+    debugPrint('✓ Scan complete - checked ${priorityIPs.length + allHosts.length} IPs (no printer found)');
   }
 
   /// Check printer at IP (HTTP + SDK verification)
@@ -240,14 +247,14 @@ class PrinterService {
         timeout: const Duration(milliseconds: 200),
       );
     } catch (e) {
-      debugPrint('Port 9100 closed');
+      // Port closed - this is expected for most IPs, don't log
       return;
     }
 
     try {
       socket.destroy();
     } catch (e) {
-      debugPrint('socket.destroy $e');
+      // Socket cleanup error - safe to ignore
     }
 
     // Check hostname pattern (BRN*/BRW*)
@@ -339,25 +346,41 @@ class PrinterService {
         final testPrinter = printer.Printer();
         printer.Printer.setUserPrinterInfo(testPrinterInfo);
 
-        //debugPrint('Calling getPrinterStatus() with 400ms timeout...');
-        final status = await testPrinter.getPrinterStatus().timeout(
-          const Duration(milliseconds: 400),
-          onTimeout: () {
-            debugPrint('      ⏱️ SDK timeout after 400ms');
-            throw TimeoutException('SDK timeout');
-          },
-        );
-        final isValid = status.errorCode == printer.ErrorCode.ERROR_NONE ||
-            status.errorCode.getName().contains('COVER_OPEN') ||
-            status.errorCode.getName().contains('PAPER');
+        // iOS needs longer timeout due to slower SDK response
+        final timeoutDuration = Platform.isIOS
+            ? const Duration(milliseconds: 1500)  // Longer for iOS
+            : const Duration(milliseconds: 400);   // Original for Android
 
-        if (isValid) {
-          await _addDiscoveredPrinter(ip, modelName, brotherModel, 'SDK');
-          return;
+        try {
+          final status = await testPrinter.getPrinterStatus().timeout(
+            timeoutDuration,
+            onTimeout: () {
+              // Return null instead of throwing to avoid crash
+              return null;
+            },
+          );
+
+          if (status == null) {
+            // Timeout occurred, skip this model
+            continue;
+          }
+
+          final isValid = status.errorCode == printer.ErrorCode.ERROR_NONE ||
+              status.errorCode.getName().contains('COVER_OPEN') ||
+              status.errorCode.getName().contains('PAPER');
+
+          if (isValid) {
+            await _addDiscoveredPrinter(ip, modelName, brotherModel, 'SDK');
+            return;
+          }
+        } on TimeoutException catch (e) {
+          // Silently continue on timeout - this is expected for wrong models
+          debugPrint('      ⏱️ SDK timeout - skipping model');
+          continue;
         }
       } catch (e) {
         debugPrint('Error: $e');
-        // Not this model or timeout, try next
+        // Not this model or error, try next
         continue;
       }
     }

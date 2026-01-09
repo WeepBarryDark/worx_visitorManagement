@@ -66,6 +66,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
   // Visitor photo
   Uint8List? _visitorPhotoBytes; // Captured visitor photo
   final ImagePicker _imagePicker = ImagePicker();
+  bool _isTakingPhoto = false; // Prevent multiple concurrent camera requests
 
   @override
   void dispose() {
@@ -142,6 +143,16 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
 
   /// Take visitor photo
   Future<void> _takePhoto() async {
+    // Prevent multiple concurrent camera requests
+    if (_isTakingPhoto) {
+      debugPrint('Camera already in use, ignoring request');
+      return;
+    }
+
+    setState(() {
+      _isTakingPhoto = true;
+    });
+
     try {
       final XFile? photo = await _imagePicker.pickImage(
         source: ImageSource.camera,
@@ -153,9 +164,11 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
 
       if (photo != null) {
         final bytes = await photo.readAsBytes();
-        setState(() {
-          _visitorPhotoBytes = bytes;
-        });
+        if (mounted) {
+          setState(() {
+            _visitorPhotoBytes = bytes;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error taking photo: $e');
@@ -166,6 +179,13 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
             backgroundColor: AppTheme.dangerColor,
           ),
         );
+      }
+    } finally {
+      // Always reset the flag
+      if (mounted) {
+        setState(() {
+          _isTakingPhoto = false;
+        });
       }
     }
   }
