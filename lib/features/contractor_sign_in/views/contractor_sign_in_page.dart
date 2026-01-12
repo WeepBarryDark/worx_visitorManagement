@@ -1,6 +1,7 @@
 // Contractor Sign-In Page
 // Displays QR code for contractors to self-register via web portal
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:worxvisitorapp/core/constants/server_link.dart';
@@ -9,9 +10,58 @@ import 'package:worxvisitorapp/core/responsive/app_breakpoints.dart';
 import 'package:worxvisitorapp/widgets/kiosk_body.dart';
 import 'package:worxvisitorapp/widgets/kiosk_guard.dart';
 import 'package:worxvisitorapp/features/dashboard/controllers/dashboard_controller.dart';
+import 'package:worxvisitorapp/services/secure_storage_service.dart';
 
-class ContractorSignInPage extends StatelessWidget {
+class ContractorSignInPage extends StatefulWidget {
   const ContractorSignInPage({super.key});
+
+  @override
+  State<ContractorSignInPage> createState() => _ContractorSignInPageState();
+}
+
+class _ContractorSignInPageState extends State<ContractorSignInPage> {
+  String? _clientSlug;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClientData();
+  }
+
+  Future<void> _loadClientData() async {
+    try {
+      final clientJson = await SecureStorageService.getClient();
+      if (clientJson != null && clientJson.isNotEmpty) {
+        final client = jsonDecode(clientJson) as Map<String, dynamic>;
+        // Try to get slug from different possible fields
+        final slug = client['slug'] as String? ??
+                     client['client_slug'] as String? ??
+                     client['identifier'] as String?;
+        if (mounted) {
+          setState(() {
+            _clientSlug = slug;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _clientSlug = null;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading client data: $e');
+      if (mounted) {
+        setState(() {
+          _clientSlug = null;
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,15 +73,32 @@ class ContractorSignInPage extends StatelessWidget {
     final siteTitle = c?.resolveSiteHeading('Contractor Sign In') ?? 'Contractor Sign In';
     final logoBytes = c?.clientLogoDisplayBytes;
 
-    // Build URL with project ID from selected site
-    // Format: https://app.worxsafety.com.au/precisioninstallations/projects/view/{siteId}
+    // Show loading indicator while fetching client data
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // Build URL with client slug and project ID from selected site
+    // Format: https://app.worxsafety.com.au/{clientSlug}/projects/view/{siteId}
+    // If missing slug or siteId, fallback to https://app.worxsafety.com.au
     final siteId = c?.currentSite?.id ?? '';
-    final String siteUrl = siteId.isNotEmpty
-        ? 'https://app.worxsafety.com.au/precisioninstallations/projects/view/$siteId'
-        : ServerLink.mainServerURL; // Fallback to default URL if no site selected
+    final clientSlug = _clientSlug;
+
+    final String siteUrl;
+    if (clientSlug != null && clientSlug.isNotEmpty && siteId.isNotEmpty) {
+      // Both slug and site ID available - build full URL
+      siteUrl = 'https://app.worxsafety.com.au/$clientSlug/projects/view/$siteId';
+    } else {
+      // Missing slug or site ID - use base URL
+      siteUrl = 'https://app.worxsafety.com.au';
+    }
 
     const double maxBodyWidth = AppBreakpoints.compact;
-    
+
     return KioskGuard(
       child: Scaffold(
         body: Container(

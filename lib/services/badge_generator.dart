@@ -563,6 +563,11 @@ class BadgeGenerator {
     addField('Person Visiting', data.supervisor);
     addField('Sign In', data.signInTime);
 
+    // Add visitor photo field height if photo was captured
+    if (data.visitorPhotoBytes != null) {
+      addField('Photo', 'Photo Uploaded');
+    }
+
     yPosition += 40;
     yPosition += qrCodeSize;
     yPosition += _measureTextHeight(

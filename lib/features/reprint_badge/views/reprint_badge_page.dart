@@ -279,6 +279,7 @@ class _ReprintBadgePageState extends State<ReprintBadgePage> {
       siteName: siteName,
       clientLogoBytes: controller?.clientLogoBytes,
       clientLogoUrl: controller?.clientLogoUrl,
+      visitorPhotoBytes: (controller?.reqVisitorPhoto ?? false) ? Uint8List(1) : null,
     );
 
     try {

@@ -1441,31 +1441,6 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
     }
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 120,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: AppTheme.slate600,
-              fontSize: 14,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(color: AppTheme.slate800, fontSize: 14),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final scaffold = PopScope(
@@ -1541,56 +1516,6 @@ class _BadgePreviewPageState extends State<_BadgePreviewPage> {
                             fit: BoxFit.contain,
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Visitor information
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.statusBackgroundColor('info'),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppTheme.slate300, width: 1),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Visitor Information',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: AppTheme.slate800,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildInfoRow(
-                            'Visitor ID:',
-                            widget.badgeData.visitorId,
-                          ),
-                          const SizedBox(height: 8),
-                          if (widget.badgeData.fullName != null) ...[
-                            _buildInfoRow('Name:', widget.badgeData.fullName!),
-                            const SizedBox(height: 8),
-                          ],
-                          if (widget.badgeData.company != null) ...[
-                            _buildInfoRow(
-                              'Company:',
-                              widget.badgeData.company!,
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          if (widget.badgeData.phone != null) ...[
-                            _buildInfoRow('Phone:', widget.badgeData.phone!),
-                            const SizedBox(height: 8),
-                          ],
-                          if (widget.badgeData.signInTime != null)
-                            _buildInfoRow(
-                              'Sign-in Time:',
-                              widget.badgeData.signInTime!,
-                            ),
-                        ],
                       ),
                     ),
                     const SizedBox(height: 24),

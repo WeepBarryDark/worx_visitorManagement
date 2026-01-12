@@ -484,6 +484,7 @@ class DashboardController extends ChangeNotifier {
       siteName: resolveSiteHeading('Visitor Badge'),
       clientLogoBytes: clientLogoBytes, // Use client logo bytes if available
       clientLogoUrl: clientLogoUrl, // Pass URL for direct download
+      visitorPhotoBytes: reqVisitorPhoto ? Uint8List(1) : null, // Dummy photo data for preview
     );
 
     // Generate the actual image (same one that will be printed)

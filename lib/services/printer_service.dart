@@ -355,15 +355,10 @@ class PrinterService {
           final status = await testPrinter.getPrinterStatus().timeout(
             timeoutDuration,
             onTimeout: () {
-              // Return null instead of throwing to avoid crash
-              return null;
+              // Throw TimeoutException to be caught by the catch block below
+              throw TimeoutException('Printer status check timed out');
             },
           );
-
-          if (status == null) {
-            // Timeout occurred, skip this model
-            continue;
-          }
 
           final isValid = status.errorCode == printer.ErrorCode.ERROR_NONE ||
               status.errorCode.getName().contains('COVER_OPEN') ||

@@ -10,7 +10,10 @@
       "WebFetch(domain:support.brother.com)",
       "WebFetch(domain:github.com)",
       "Bash(flutter pub:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter build:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
