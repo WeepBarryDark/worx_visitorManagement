@@ -618,24 +618,30 @@ class SecureStorageService {
   }
 
   /// Save selected paper type for printing (JSON string)
-  static Future<void> savePaperType(String paperTypeJson) async {
+  /// Save paper type (accepts Map)
+  static Future<void> savePaperType(Map<String, dynamic> paperTypeMap) async {
     try {
+      final paperTypeJson = jsonEncode(paperTypeMap);
       await _storage.write(
         key: _keyPaperType,
         value: paperTypeJson,
       );
-      debugPrint('Paper type saved: $paperTypeJson');
+      debugPrint('✅ Paper type saved: ${paperTypeMap['code']}');
     } catch (e) {
-      debugPrint('Error saving paper type: $e');
+      debugPrint('❌ Error saving paper type: $e');
     }
   }
 
-  /// Get saved paper type (JSON string)
-  static Future<String?> getPaperType() async {
+  /// Get saved paper type (returns Map)
+  static Future<Map<String, dynamic>?> getPaperType() async {
     try {
-      return await _storage.read(key: _keyPaperType);
+      final paperTypeJson = await _storage.read(key: _keyPaperType);
+      if (paperTypeJson != null && paperTypeJson.isNotEmpty) {
+        return jsonDecode(paperTypeJson) as Map<String, dynamic>;
+      }
+      return null;
     } catch (e) {
-      debugPrint('Error reading paper type: $e');
+      debugPrint('❌ Error reading paper type: $e');
       return null;
     }
   }

@@ -45,7 +45,11 @@ class _VisitorDeliveriesPage extends State<VisitorDeliveriesPage> {
     });
 
     // Load data in parallel for faster initialization
-    await Future.wait([_refreshContacts(), _refreshSites()]);
+    // Use eagerError: false to ensure all tasks complete even if one fails
+    await Future.wait(
+      [_refreshContacts(), _refreshSites()],
+      eagerError: false,
+    );
 
     if (mounted) {
       setState(() {

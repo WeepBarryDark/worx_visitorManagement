@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -253,7 +254,7 @@ class ApiService {
 
   /// Submit visitor sign-in ledger
   /// Required: site_id, name, email, questions, unique_id
-  /// Optional: organisation, phone, address, work_type, supervisor, sign_in_time, visitor_photos
+  /// Optional: organisation, phone, address, work_type, supervisor, sign_in_time, photo
   /// Returns: {message: "Login Complete", visitor_id: "VIS12345", unique_id: "VIS12345"}
   static Future<Map<String, dynamic>> submitSignInLedger({
     required String token,
@@ -269,70 +270,103 @@ class ApiService {
     String? workType,
     String? supervisor,
     String? signInTime,
-    Map<String, String>? visitorPhotos, // Map of visitor ID to base64 photo
+    Uint8List? visitorPhotoBytes,
+    String? visitorPhotoFilename,
   }) async {
     try {
-      // Build payload with required fields
-      final payload = <String, dynamic>{
-        'site_id': siteId,
-        'name': name,
-        'email': email,
-        'questions': questions,
-        'unique_id': uniqueId,
-      };
+      final uri = Uri.parse(ServerLink.pushVisitorSignInLedge);
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..headers['Accept'] = 'application/json';
 
-      // Add optional fields only if provided
+      // Required fields
+      request.fields['site_id'] = siteId;
+      request.fields['name'] = name;
+      request.fields['email'] = email;
+      request.fields['questions'] = jsonEncode(questions);
+      request.fields['unique_id'] = uniqueId;
+
+      // Optional fields
       if (organisation != null && organisation.isNotEmpty) {
-        payload['organisation'] = organisation;
+        request.fields['organisation'] = organisation;
       }
       if (phone != null && phone.isNotEmpty) {
-        payload['phone'] = phone;
+        request.fields['phone'] = phone;
       }
       if (address != null && address.isNotEmpty) {
-        payload['address'] = address;
+        request.fields['address'] = address;
       }
       if (workType != null && workType.isNotEmpty) {
-        payload['work_type'] = workType;
+        request.fields['work_type'] = workType;
       }
       if (supervisor != null && supervisor.isNotEmpty) {
-        payload['supervisor'] = supervisor;
+        request.fields['supervisor'] = supervisor;
       }
       if (signInTime != null && signInTime.isNotEmpty) {
-        payload['sign_in_time'] = signInTime;
-      }
-      if (visitorPhotos != null && visitorPhotos.isNotEmpty) {
-        // Add photos with visitor ID as key
-        payload['visitor_photos'] = visitorPhotos;
+        request.fields['sign_in_time'] = signInTime;
       }
 
-      final response = await http
-          .post(
-            Uri.parse(ServerLink.pushVisitorSignInLedge),
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: jsonEncode(payload),
-          )
-          .timeout(const Duration(seconds: 10));
+      // Add visitor photo as multipart file if available
+      if (visitorPhotoBytes != null && visitorPhotoBytes.isNotEmpty) {
+        final filename = visitorPhotoFilename ?? 'visitor_photo.jpg';
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        // Determine MIME type based on filename extension
+        String contentType = 'image/jpeg';
+        if (filename.toLowerCase().endsWith('.png')) {
+          contentType = 'image/png';
+        } else if (filename.toLowerCase().endsWith('.jpg') ||
+                   filename.toLowerCase().endsWith('.jpeg')) {
+          contentType = 'image/jpeg';
+        }
+
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'photo', // Field name that server expects
+            visitorPhotoBytes,
+            filename: filename,
+            contentType: http.MediaType.parse(contentType),
+          ),
+        );
+      } else {
+        debugPrint('No photo to upload');
+      }
+
+      debugPrint(
+        'Submitting visitor sign-in (multipart) to: ${ServerLink.pushVisitorSignInLedge}',
+      );
+
+      final streamedResponse =
+          await request.send().timeout(const Duration(seconds: 10));
+      final responseBody = await streamedResponse.stream.bytesToString();
+
+      debugPrint('Response status: ${streamedResponse.statusCode}');
+      debugPrint('Response body: $responseBody');
+
+      if (streamedResponse.statusCode == 200) {
+        final data = jsonDecode(responseBody) as Map<String, dynamic>;
 
         // Check for error messages in response
         if (data.containsKey('error')) {
+          debugPrint('Error in response: ${data['error']}');
           throw Exception(data['error']);
         }
         if (data.containsKey('message') && data['message'] == 'Evacuate') {
+          debugPrint('Site is in evacuation mode');
           throw Exception('Site is in evacuation mode');
+        }
+
+        debugPrint('Sign-in submitted successfully');
+        if (data.containsKey('visitor_id') || data.containsKey('unique_id')) {
+          debugPrint(
+            '  Visitor ID: ${data['visitor_id'] ?? data['unique_id']}',
+          );
         }
 
         return data;
       } else {
         // Try to parse error message from response
         try {
-          final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+          final errorData = jsonDecode(responseBody) as Map<String, dynamic>;
 
           // Extract error message from various possible formats
           String errorMessage = 'Failed to submit sign-in';
@@ -363,7 +397,9 @@ class ApiService {
                   false) {
             rethrow;
           }
-          throw Exception('Failed to submit sign-in: ${response.statusCode}');
+          throw Exception(
+            'Failed to submit sign-in: ${streamedResponse.statusCode}',
+          );
         }
       }
     } catch (e) {
@@ -371,7 +407,6 @@ class ApiService {
       rethrow;
     }
   }
-
   /// Sign out a visitor by visitor_id
   /// POST /api/visitor/sign_out
   /// Payload: {visitor_id: "VISITOR123"}
@@ -399,7 +434,7 @@ class ApiService {
               throw Exception('Sign-out request timed out');
             },
           );
-
+          
       // Handle redirects (302, etc) - usually means auth failed
       if (response.statusCode >= 300 && response.statusCode < 400) {
         debugPrint(
@@ -499,6 +534,68 @@ class ApiService {
     } catch (e) {
       debugPrint('Error sending email: $e');
       return false;
+    }
+  }
+
+  // ============================================================================
+  // FETCH SIGNED IN VISITORS
+  // ============================================================================
+
+  /// Fetch all signed in visitors for a site
+  /// POST /api/visitor/site_visitors
+  /// Payload: {"site_id": "..."}
+  /// Returns: List of signed in visitors
+  static Future<List<Map<String, dynamic>>> fetchSignedInVisitors({
+    required String token,
+    required String siteId,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(ServerLink.fetchSignedInvisitor),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'site_id': siteId}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+          debugPrint(ServerLink.fetchSignedInvisitor);
+          debugPrint(siteId);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint(ServerLink.fetchSignedInvisitor);
+        debugPrint(siteId);
+        debugPrint('===============================');
+        debugPrint(jsonEncode(data));
+
+        // Handle different response formats
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        } else if (data is Map<String, dynamic>) {
+          // Check common keys for visitor lists
+          if (data['data'] is List) {
+            return List<Map<String, dynamic>>.from(data['data']);
+          } else if (data['visitors'] is List) {
+            return List<Map<String, dynamic>>.from(data['visitors']);
+          } else if (data['site_visitors'] is List) {
+            return List<Map<String, dynamic>>.from(data['site_visitors']);
+          } else if (data['events'] is List) {
+            return List<Map<String, dynamic>>.from(data['events']);
+          }
+        }
+
+        // Fallback: return empty list
+        return [];
+      } else {
+        throw Exception('Failed to fetch signed in visitors: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error fetching signed in visitors: $e');
+      rethrow;
     }
   }
 }

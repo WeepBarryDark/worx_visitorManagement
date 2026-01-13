@@ -4,7 +4,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:worxvisitorapp/core/constants/server_link.dart';
 import 'package:worxvisitorapp/core/constants/app_routes.dart';
 import 'package:worxvisitorapp/core/responsive/app_breakpoints.dart';
 import 'package:worxvisitorapp/widgets/kiosk_body.dart';
@@ -34,10 +33,16 @@ class _ContractorSignInPageState extends State<ContractorSignInPage> {
       final clientJson = await SecureStorageService.getClient();
       if (clientJson != null && clientJson.isNotEmpty) {
         final client = jsonDecode(clientJson) as Map<String, dynamic>;
+        debugPrint('📊 Contractor Sign-In: Client data loaded');
+        debugPrint('   Raw client: $client');
+
         // Try to get slug from different possible fields
         final slug = client['slug'] as String? ??
                      client['client_slug'] as String? ??
                      client['identifier'] as String?;
+
+        debugPrint('   Extracted slug: $slug');
+
         if (mounted) {
           setState(() {
             _clientSlug = slug;
@@ -45,6 +50,7 @@ class _ContractorSignInPageState extends State<ContractorSignInPage> {
           });
         }
       } else {
+        debugPrint('⚠️ Contractor Sign-In: No client data found in storage');
         if (mounted) {
           setState(() {
             _clientSlug = null;
@@ -53,7 +59,7 @@ class _ContractorSignInPageState extends State<ContractorSignInPage> {
         }
       }
     } catch (e) {
-      debugPrint('Error loading client data: $e');
+      debugPrint('❌ Error loading client data: $e');
       if (mounted) {
         setState(() {
           _clientSlug = null;
@@ -75,6 +81,7 @@ class _ContractorSignInPageState extends State<ContractorSignInPage> {
 
     // Show loading indicator while fetching client data
     if (_isLoading) {
+      debugPrint('⏳ Contractor Sign-In: Still loading client data...');
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),
@@ -82,20 +89,37 @@ class _ContractorSignInPageState extends State<ContractorSignInPage> {
       );
     }
 
+    debugPrint('✅ Contractor Sign-In: Loading complete, building UI...');
+
     // Build URL with client slug and project ID from selected site
     // Format: https://app.worxsafety.com.au/{clientSlug}/projects/view/{siteId}
     // If missing slug or siteId, fallback to https://app.worxsafety.com.au
     final siteId = c?.currentSite?.id ?? '';
     final clientSlug = _clientSlug;
 
+    debugPrint('═════════════════════════════════════════════');
+    debugPrint('🔗 CONTRACTOR SIGN-IN URL BUILDER');
+    debugPrint('   Client Slug: "$clientSlug"');
+    debugPrint('   Site ID: "$siteId"');
+    debugPrint('   Current Site: ${c?.currentSite?.title ?? "NULL"}');
+
     final String siteUrl;
     if (clientSlug != null && clientSlug.isNotEmpty && siteId.isNotEmpty) {
       // Both slug and site ID available - build full URL
       siteUrl = 'https://app.worxsafety.com.au/$clientSlug/projects/view/$siteId';
+      debugPrint('✅ FULL URL: $siteUrl');
     } else {
       // Missing slug or site ID - use base URL
       siteUrl = 'https://app.worxsafety.com.au';
+      debugPrint('⚠️ FALLBACK URL: $siteUrl');
+      if (clientSlug == null || clientSlug.isEmpty) {
+        debugPrint('   ❌ Problem: Client Slug is missing!');
+      }
+      if (siteId.isEmpty) {
+        debugPrint('   ❌ Problem: Site ID is missing!');
+      }
     }
+    debugPrint('═════════════════════════════════════════════');
 
     const double maxBodyWidth = AppBreakpoints.compact;
 
@@ -163,6 +187,7 @@ class _ContractorSignInPageState extends State<ContractorSignInPage> {
                                 ],
                               ),
                               child: QrImageView(
+                                key: ValueKey(siteUrl), // Force rebuild when URL changes
                                 data: siteUrl,
                                 version: QrVersions.auto,
                                 size: 280,
@@ -189,7 +214,7 @@ class _ContractorSignInPageState extends State<ContractorSignInPage> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  ServerLink.mainServerURL,
+                                  siteUrl,
                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     fontFamily: 'monospace',
                                     color: Theme.of(context).colorScheme.onSurfaceVariant,

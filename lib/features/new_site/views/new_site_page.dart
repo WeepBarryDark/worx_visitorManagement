@@ -96,14 +96,13 @@ class _NewSitePageState extends State<NewSitePage> {
       // Call API to get fresh sites
       final sitesData = await ApiService.fetchVisitorSites(authToken);
 
-      if (sitesData['data'] != null && sitesData['count'] > 0) {
-        final sites = sitesData['data'] as List<dynamic>;
-
+      final sitesRaw = sitesData['data'];
+      if (sitesRaw is List<dynamic>) {
         // Save to secure storage for offline access
-        await SecureStorageService.saveSites(jsonEncode(sites));
+        await SecureStorageService.saveSites(jsonEncode(sitesRaw));
 
         if (kDebugMode) {
-          debugPrint('Fetched ${sites.length} sites from API');
+          debugPrint('Fetched ${sitesRaw.length} sites from API');
         }
 
         // Load sites into controller
@@ -111,6 +110,12 @@ class _NewSitePageState extends State<NewSitePage> {
 
         if (mounted) {
           setState(() {}); // Trigger rebuild with loaded sites
+        }
+      } else {
+        // Fallback to secure storage if API payload is unexpected
+        await _controller.reloadSites();
+        if (mounted) {
+          setState(() {});
         }
       }
     } catch (e) {

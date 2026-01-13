@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:worxvisitorapp/core/models/site_item.dart';
 import 'package:worxvisitorapp/core/models/contact_detail.dart';
+import 'package:worxvisitorapp/core/models/paper_type.dart';
 import 'package:worxvisitorapp/services/secure_storage_service.dart';
 import 'package:worxvisitorapp/services/printer_service.dart';
 import 'package:worxvisitorapp/services/badge_generator.dart';
@@ -30,8 +31,13 @@ class DashboardController extends ChangeNotifier {
       false; // Track if user manually clicked retry button
   String printerName = 'Not connected';
   String printerIp = '-';
+  String printerModel = ''; // Printer model (QL-820NWB, QL-720NW, etc.)
   bool printVisitorBadge = true; // Enable/disable automatic badge printing
   bool hasTestPrinted = false; // Track if test print has been done (reset on paper type change)
+
+  // Paper type selection
+  PaperType selectedPaperType = PaperType.defaultType;
+  List<PaperType> availablePaperTypes = []; // Paper types for current printer model
 
   // Printer service for Network discovery
   final PrinterService printerService = PrinterService();
@@ -326,6 +332,11 @@ class DashboardController extends ChangeNotifier {
               initialized = true;
               printerName = printer.name;
               printerIp = printer.address;
+              printerModel = printer.model;
+
+              // Update available paper types based on printer model
+              _updateAvailablePaperTypes(printer.model);
+
               hasAttemptedConnection = true;
               notifyListeners();
               return;
@@ -353,6 +364,10 @@ class DashboardController extends ChangeNotifier {
                 initialized = true;
                 printerName = firstPrinter.name;
                 printerIp = firstPrinter.address;
+                printerModel = firstPrinter.model;
+
+                // Update available paper types based on printer model
+                _updateAvailablePaperTypes(firstPrinter.model);
               } else {
                 initialized = false;
                 printerName = 'No printers found';
@@ -435,6 +450,76 @@ class DashboardController extends ChangeNotifier {
     printerIp = ip;
     hasAttemptedConnection = true;
     notifyListeners();
+  }
+
+  /// Update available paper types based on printer model
+  void _updateAvailablePaperTypes(String model) {
+    debugPrint('📄 Updating paper types for model: $model');
+
+    // Get paper types for this model
+    availablePaperTypes = PaperType.getPaperTypesForModel(model);
+
+    debugPrint('📄 Available paper types: ${availablePaperTypes.length}');
+    for (var paper in availablePaperTypes) {
+      debugPrint('   - ${paper.fullDisplayName}');
+    }
+
+    // Load saved paper type or use default
+    _loadSavedPaperType();
+  }
+
+  /// Select a paper type
+  void selectPaperType(PaperType paperType) {
+    debugPrint('📄 Selecting paper type: ${paperType.fullDisplayName}');
+    selectedPaperType = paperType;
+    hasTestPrinted = false; // Reset test print flag when paper changes
+    notifyListeners();
+
+    // Save to storage
+    _savePaperType(paperType);
+  }
+
+  /// Save selected paper type to storage
+  Future<void> _savePaperType(PaperType paperType) async {
+    try {
+      await SecureStorageService.savePaperType(paperType.toJson());
+      debugPrint('✅ Paper type saved: ${paperType.code}');
+    } catch (e) {
+      debugPrint('❌ Failed to save paper type: $e');
+    }
+  }
+
+  /// Load saved paper type from storage
+  Future<void> _loadSavedPaperType() async {
+    try {
+      final paperMap = await SecureStorageService.getPaperType();
+      if (paperMap != null) {
+        final paper = PaperType.fromJson(paperMap);
+
+        // Check if saved paper is compatible with current printer
+        if (availablePaperTypes.any((p) => p.code == paper.code)) {
+          selectedPaperType = paper;
+          debugPrint('✅ Loaded saved paper type: ${paper.code}');
+        } else {
+          debugPrint('⚠️ Saved paper type ${paper.code} not compatible with current printer');
+          selectedPaperType = availablePaperTypes.isNotEmpty
+              ? availablePaperTypes.first
+              : PaperType.defaultType;
+        }
+      } else {
+        // Use first available paper type or default
+        selectedPaperType = availablePaperTypes.isNotEmpty
+            ? availablePaperTypes.first
+            : PaperType.defaultType;
+        debugPrint('ℹ️ No saved paper type, using: ${selectedPaperType.code}');
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Failed to load paper type: $e');
+      selectedPaperType = availablePaperTypes.isNotEmpty
+          ? availablePaperTypes.first
+          : PaperType.defaultType;
+    }
   }
 
   // ========== CLIENT LOGO MANAGEMENT ==========

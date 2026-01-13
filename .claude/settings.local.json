@@ -13,7 +13,8 @@
       "Bash(find:*)",
       "Bash(flutter clean:*)",
       "Bash(flutter build:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(del \"lib\\\\widgets\\\\paper_type_selector.dart\")"
     ]
   }
 }

@@ -10,6 +10,7 @@ import 'package:worxvisitorapp/widgets/kiosk_body.dart';
 import 'package:worxvisitorapp/widgets/kiosk_guard.dart';
 import 'package:worxvisitorapp/features/dashboard/controllers/dashboard_controller.dart';
 import 'package:worxvisitorapp/services/secure_storage_service.dart';
+import 'package:worxvisitorapp/services/api_service.dart';
 import 'package:worxvisitorapp/services/badge_generator.dart';
 import 'package:worxvisitorapp/core/models/print_status.dart';
 import 'package:worxvisitorapp/widgets/print_progress_widget.dart';
@@ -99,107 +100,113 @@ class _ReprintBadgePageState extends State<ReprintBadgePage> {
   }
 
   Future<void> _loadRecentVisitors() async {
-    // TODO: Replace with API call when available
-    // For now, use combination of stored visitors and dummy data
-
     final byId = <String, _SignedVisitor>{};
 
-    // Try to load from storage first
     try {
-      final visitors = await SecureStorageService.getSignedVisitors();
-      for (final visitor in visitors) {
-        final id = visitor['id']?.toString().trim() ?? '';
-        final email = visitor['email']?.toString().trim().toLowerCase() ?? '';
-        final fullName = visitor['full_name']?.toString() ?? '';
-        final phone = visitor['phone']?.toString().trim() ?? '';
-        final workType = visitor['work_type']?.toString().trim() ?? '';
-        final company = visitor['company']?.toString().trim() ?? '';
-        final address = visitor['address']?.toString().trim() ?? '';
-        final supervisor = visitor['supervisor_name']?.toString().trim() ?? '';
-        final signInTime = visitor['sign_in_time']?.toString().trim() ?? '';
+      // Get auth token and site ID
+      final token = await SecureStorageService.getAuthToken();
+      final controller = DashboardController.instance;
+      final siteId = controller?.currentSite?.id;
 
-        final record = _SignedVisitor(
-          id: id,
-          email: email,
-          fullName: fullName,
-          phone: phone,
-          workType: workType,
-          company: company,
-          address: address,
-          supervisor: supervisor,
-          signInTime: signInTime,
-        );
+      if (token == null || token.isEmpty) {
+        debugPrint('❌ No auth token found');
+        throw Exception('Authentication required');
+      }
+
+      if (siteId == null || siteId.isEmpty) {
+        debugPrint('❌ No site selected');
+        throw Exception('Please select a site');
+      }
+
+      debugPrint('📡 Fetching signed in visitors from API...');
+      debugPrint('   Site ID: $siteId');
+
+      // Fetch visitors from API
+      final visitors = await ApiService.fetchSignedInVisitors(
+        token: token,
+        siteId: siteId,
+      );
+
+      debugPrint('✅ Received ${visitors.length} visitors from API');
+
+      // Parse visitors into _SignedVisitor objects
+      for (final visitor in visitors) {
+        // IMPORTANT: Use visitor_id (VIS...) NOT database id
+        // Badge generation requires the visitor_id format
+        final id = visitor['visitor_id']?.toString().trim() ??
+                   visitor['unique_id']?.toString().trim() ??
+                   visitor['id']?.toString().trim() ?? '';
+        final email = visitor['email']?.toString().trim().toLowerCase() ?? '';
+        final fullName = visitor['full_name']?.toString() ??
+                        visitor['name']?.toString() ?? '';
+        final phone = visitor['phone']?.toString().trim() ??
+                     visitor['mobile']?.toString().trim() ?? '';
+        final workType = visitor['work_type']?.toString().trim() ??
+                        visitor['type']?.toString().trim() ?? '';
+        final company = visitor['company']?.toString().trim() ??
+                       visitor['organisation']?.toString().trim() ?? '';
+        final address = visitor['address']?.toString().trim() ?? '';
+        final supervisor = visitor['supervisor']?.toString().trim() ??
+                          visitor['supervisor_name']?.toString().trim() ?? '';
+        final signInTime = visitor['sign_in_time']?.toString().trim() ??
+                          visitor['signed_in_at']?.toString().trim() ??
+                          visitor['created_at']?.toString().trim() ?? '';
 
         if (id.isNotEmpty) {
+          final record = _SignedVisitor(
+            id: id,
+            email: email,
+            fullName: fullName,
+            phone: phone,
+            workType: workType,
+            company: company,
+            address: address,
+            supervisor: supervisor,
+            signInTime: signInTime,
+          );
           byId[id] = record;
         }
       }
+
+      debugPrint('✅ Parsed ${byId.length} visitors successfully');
     } catch (e) {
-      debugPrint('Error loading stored visitors: $e');
-    }
+      debugPrint('❌ Error loading visitors from API: $e');
 
-    // Add dummy data for testing (will be removed when API is available)
-    if (byId.isEmpty) {
-      final dummyVisitors = [
-        _SignedVisitor(
-          id: 'V001',
-          email: 'john.smith@example.com',
-          fullName: 'John Smith',
-          phone: '+61 412 345 678',
-          workType: 'Contractor',
-          company: 'ABC Construction',
-          address: '123 Main St, Sydney',
-          supervisor: 'Barry Wang',
-          signInTime: '2026-01-08 09:30 AM',
-        ),
-        _SignedVisitor(
-          id: 'V002',
-          email: 'sarah.jones@example.com',
-          fullName: 'Sarah Jones',
-          phone: '+61 423 456 789',
-          workType: 'Visitor',
-          company: 'XYZ Corporation',
-          address: '456 Park Ave, Melbourne',
-          supervisor: 'Barry Wang',
-          signInTime: '2026-01-08 10:15 AM',
-        ),
-        _SignedVisitor(
-          id: 'V003',
-          email: 'michael.chen@example.com',
-          fullName: 'Michael Chen',
-          phone: '+61 434 567 890',
-          workType: 'Delivery',
-          company: 'Fast Delivery Co',
-          address: '789 High St, Brisbane',
-          supervisor: 'Barry Wang',
-          signInTime: '2026-01-08 11:00 AM',
-        ),
-        _SignedVisitor(
-          id: 'V004',
-          email: 'emma.wilson@example.com',
-          fullName: 'Emma Wilson',
-          phone: '+61 445 678 901',
-          workType: 'Contractor',
-          company: 'Building Services',
-          address: '321 Queen St, Perth',
-          supervisor: 'Barry Wang',
-          signInTime: '2026-01-08 11:45 AM',
-        ),
-        _SignedVisitor(
-          id: 'V005',
-          email: 'david.brown@example.com',
-          fullName: 'David Brown',
-          phone: '+61 456 789 012',
-          workType: 'Visitor',
-          company: 'Tech Solutions Ltd',
-          address: '654 King St, Adelaide',
-          supervisor: 'Barry Wang',
-          signInTime: '2026-01-08 01:30 PM',
-        ),
-      ];
+      // Fallback: Try to load from local storage
+      debugPrint('📦 Falling back to local storage...');
+      try {
+        final visitors = await SecureStorageService.getSignedVisitors();
+        for (final visitor in visitors) {
+          // Use visitor_id from local storage (should be VIS... format)
+          final id = visitor['visitor_id']?.toString().trim() ??
+                     visitor['id']?.toString().trim() ?? '';
+          final email = visitor['email']?.toString().trim().toLowerCase() ?? '';
+          final fullName = visitor['full_name']?.toString() ?? '';
+          final phone = visitor['phone']?.toString().trim() ?? '';
+          final workType = visitor['work_type']?.toString().trim() ?? '';
+          final company = visitor['company']?.toString().trim() ?? '';
+          final address = visitor['address']?.toString().trim() ?? '';
+          final supervisor = visitor['supervisor_name']?.toString().trim() ?? '';
+          final signInTime = visitor['sign_in_time']?.toString().trim() ?? '';
 
-      for (final visitor in dummyVisitors) {
-        byId[visitor.id] = visitor;
+          if (id.isNotEmpty) {
+            final record = _SignedVisitor(
+              id: id,
+              email: email,
+              fullName: fullName,
+              phone: phone,
+              workType: workType,
+              company: company,
+              address: address,
+              supervisor: supervisor,
+              signInTime: signInTime,
+            );
+            byId[id] = record;
+          }
+        }
+        debugPrint('✅ Loaded ${byId.length} visitors from local storage');
+      } catch (storageError) {
+        debugPrint('❌ Error loading from storage: $storageError');
       }
     }
 
@@ -213,10 +220,13 @@ class _ReprintBadgePageState extends State<ReprintBadgePage> {
   Future<void> _showSignedInVisitorsList() async {
     if (_visitorsById.isEmpty) {
       if (!mounted) return;
+      // Clear any existing snackbars first to prevent accumulation
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No signed-in visitors found on this device'),
+          content: Text('No signed-in visitors found. Please try again or check your connection.'),
           backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
         ),
       );
       return;
@@ -248,39 +258,46 @@ class _ReprintBadgePageState extends State<ReprintBadgePage> {
     final controller = DashboardController.instance;
     final siteName = controller?.resolveSiteHeading('Visitor Badge') ?? 'Visitor Badge';
 
-    // Respect dashboard settings for which fields to display on badge
-    // Only include fields that are enabled in dashboard configuration
+    // REPRINT LOGIC: Display fields based on what data actually exists
+    // If the visitor has email/phone/etc in their data, show it on the badge
+    // This recreates the original badge as it was when first printed
+    debugPrint('🎫 REPRINT BADGE - Visitor Data:');
+    debugPrint('   Visitor ID: ${visitor.id}');
+    debugPrint('   Full Name: "${visitor.fullName}" (${visitor.fullName.isNotEmpty ? "✓" : "✗"})');
+    debugPrint('   Email: "${visitor.email}" (${visitor.email.isNotEmpty ? "✓" : "✗"})');
+    debugPrint('   Phone: "${visitor.phone}" (${visitor.phone.isNotEmpty ? "✓" : "✗"})');
+    debugPrint('   Company: "${visitor.company}" (${visitor.company.isNotEmpty ? "✓" : "✗"})');
+    debugPrint('   Work Type: "${visitor.workType}" (${visitor.workType.isNotEmpty ? "✓" : "✗"})');
+    debugPrint('   Address: "${visitor.address}" (${visitor.address.isNotEmpty ? "✓" : "✗"})');
+    debugPrint('   Supervisor: "${visitor.supervisor}" (${visitor.supervisor.isNotEmpty ? "✓" : "✗"})');
+    debugPrint('   Sign In Time: "${visitor.signInTime}" (${visitor.signInTime.isNotEmpty ? "✓" : "✗"})');
+
     final badgeData = BadgeData(
       visitorId: visitor.id,
-      fullName: (controller?.reqFullName ?? true) && visitor.fullName.isNotEmpty
-          ? visitor.fullName
-          : null,
-      email: (controller?.reqEmail ?? true) && visitor.email.isNotEmpty
-          ? visitor.email
-          : null,
-      phone: (controller?.reqPhone ?? false) && visitor.phone.isNotEmpty
-          ? visitor.phone
-          : null,
-      workType: (controller?.reqWorkType ?? false) && visitor.workType.isNotEmpty
-          ? visitor.workType
-          : null,
-      company: (controller?.reqCompany ?? false) && visitor.company.isNotEmpty
-          ? visitor.company
-          : null,
-      address: (controller?.reqAddress ?? false) && visitor.address.isNotEmpty
-          ? visitor.address
-          : null,
-      supervisor: (controller?.reqSupervisor ?? false) && visitor.supervisor.isNotEmpty
-          ? visitor.supervisor
-          : null,
-      signInTime: (controller?.reqSignInTime ?? true) && visitor.signInTime.isNotEmpty
-          ? visitor.signInTime
-          : null,
+      // Show field ONLY if it has actual data
+      fullName: visitor.fullName.isNotEmpty ? visitor.fullName : null,
+      email: visitor.email.isNotEmpty ? visitor.email : null,
+      phone: visitor.phone.isNotEmpty ? visitor.phone : null,
+      workType: visitor.workType.isNotEmpty ? visitor.workType : null,
+      company: visitor.company.isNotEmpty ? visitor.company : null,
+      address: visitor.address.isNotEmpty ? visitor.address : null,
+      supervisor: visitor.supervisor.isNotEmpty ? visitor.supervisor : null,
+      signInTime: visitor.signInTime.isNotEmpty ? visitor.signInTime : null,
       siteName: siteName,
       clientLogoBytes: controller?.clientLogoBytes,
       clientLogoUrl: controller?.clientLogoUrl,
-      visitorPhotoBytes: (controller?.reqVisitorPhoto ?? false) ? Uint8List(1) : null,
+      visitorPhotoBytes: null, // Photo not available for reprint
     );
+
+    debugPrint('🎫 BADGE DATA TO GENERATE:');
+    debugPrint('   Full Name: ${badgeData.fullName ?? "NULL"}');
+    debugPrint('   Email: ${badgeData.email ?? "NULL"}');
+    debugPrint('   Phone: ${badgeData.phone ?? "NULL"}');
+    debugPrint('   Company: ${badgeData.company ?? "NULL"}');
+    debugPrint('   Work Type: ${badgeData.workType ?? "NULL"}');
+    debugPrint('   Address: ${badgeData.address ?? "NULL"}');
+    debugPrint('   Supervisor: ${badgeData.supervisor ?? "NULL"}');
+    debugPrint('   Sign In Time: ${badgeData.signInTime ?? "NULL"}');
 
     try {
       // Generate ui.Image directly (same as sign in page)

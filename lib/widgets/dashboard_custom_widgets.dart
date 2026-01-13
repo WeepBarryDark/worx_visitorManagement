@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
@@ -86,11 +85,10 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
       _isLoadingPaperType = true;
     });
 
-    final savedPaperTypeJson = await SecureStorageService.getPaperType();
+    final savedPaperTypeMap = await SecureStorageService.getPaperType();
     try {
-      if (savedPaperTypeJson != null) {
-        final paperTypeData = jsonDecode(savedPaperTypeJson) as Map<String, dynamic>;
-        final paperType = PaperType.fromJson(paperTypeData);
+      if (savedPaperTypeMap != null) {
+        final paperType = PaperType.fromJson(savedPaperTypeMap);
         setState(() {
           _selectedPaperType = paperType;
         });
@@ -105,26 +103,6 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
     });
   }
 
-  /// Save selected paper type
-  Future<void> _savePaperType(PaperType paperType, {bool showFeedback = true}) async {
-    final paperTypeJson = jsonEncode(paperType.toJson());
-    await SecureStorageService.savePaperType(paperTypeJson);
-    setState(() {
-      _selectedPaperType = paperType;
-    });
-
-    // Reset test print flag when paper type changes
-    widget.controller.resetTestPrintFlag();
-
-    if (!mounted || !showFeedback) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Paper type saved: ${paperType.name}'),
-        backgroundColor: AppTheme.successColor,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 
   Future<void> _addManualPrinter() async {
     final ip = _ipController.text.trim();
@@ -488,6 +466,55 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  // Show printer model info
+                  if (c.printerModel.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.print,
+                            size: 14,
+                            color: AppTheme.primaryBlue,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Model: ${c.printerModel}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryBlue,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.successColor,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              '${c.availablePaperTypes.length} options',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Text(
                     'Select the type of label paper installed in your printer',
                     style: TextStyle(
@@ -503,20 +530,65 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     )
+                  else if (c.availablePaperTypes.isEmpty)
+                    // No paper types available
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.statusBackgroundColor('warning'),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber,
+                            color: AppTheme.warningColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No paper types available for this printer model',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.slate700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
                   else
                     DropdownButtonFormField<PaperType>(
-                      initialValue: _selectedPaperType,
+                      initialValue: c.availablePaperTypes.contains(c.selectedPaperType)
+                          ? c.selectedPaperType
+                          : (c.availablePaperTypes.isNotEmpty ? c.availablePaperTypes.first : null),
                       isExpanded: true,
                       itemHeight: 72,
+                      selectedItemBuilder: (context) {
+                        return c.availablePaperTypes.map((paperType) {
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              paperType.fullDisplayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          );
+                        }).toList();
+                      },
                       decoration: InputDecoration(
                         labelText: 'Select Paper Type',
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.print),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                         filled: true,
                         fillColor: Colors.white,
                         errorText: _selectedPaperType == null ? 'Please select a paper type' : null,
                       ),
-                      items: PaperType.supportedTypes.map((paperType) {
+                      items: c.availablePaperTypes.map((paperType) {
                         return DropdownMenuItem<PaperType>(
                           value: paperType,
                           child: ListTile(
@@ -524,23 +596,29 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                             visualDensity: VisualDensity.compact,
                             contentPadding: EdgeInsets.zero,
                             title: Text(
-                              paperType.name,
+                              paperType.code,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
-                            /*
                             subtitle: Text(
                               paperType.description,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(fontSize: 11, color: AppTheme.slate600),
-                            ),*/
+                            ),
                           ),
                         );
                       }).toList(),
                       onChanged: (paperType) {
-                        if (paperType != null) _savePaperType(paperType);
+                        if (paperType != null) {
+                          // Use controller's method to update paper type
+                          c.selectPaperType(paperType);
+                          // Also update local state
+                          setState(() {
+                            _selectedPaperType = paperType;
+                          });
+                        }
                       },
                     ),
                   if (_selectedPaperType == null) ...[
@@ -740,7 +818,7 @@ class _PrintStatusCardState extends State<PrintStatusCard> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Current: ${_selectedPaperType!.dimensions}${_selectedPaperType!.isContinuous ? ' (continuous)' : ''}',
+                              'Current: ${_selectedPaperType!.code} - ${_selectedPaperType!.width} ${_selectedPaperType!.material}',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: AppTheme.slate700,

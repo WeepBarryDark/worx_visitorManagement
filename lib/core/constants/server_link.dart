@@ -7,7 +7,7 @@ class ServerLink {
 
   static const String fetchVisitorSites = '${ServerLink.mainServerURL}/api/visitor/sites'; // get sites  {token}
   static const String fetchVisitorContacts = '${ServerLink.mainServerURL}/api/visitor/contacts'; // get contacts  {token}
-  static const String fetchVisitorClient = '${ServerLink.mainServerURL}/api/visitor/client'; // get clients  {token}
+  static const String fetchVisitorClient = '${ServerLink.mainServerURL}/api/visitor/client'; // get clients  {token} 
 
   static const String fetchVisitorQuestions = '${ServerLink.mainServerURL}/api/visitor/site_questions'; // post  {token}{"site_id": }
   static const String sendSMS = '${ServerLink.mainServerURL}/api/visitor/send_sms'; // post {token}{"user_id": "23", "mobile":"0422502693","message": "this is a test message"}
@@ -25,7 +25,7 @@ class ServerLink {
   ///error: 'message' => 'Evacuate'
   ///error: 'error' => 'Signed In already'
   
-  static const String fetchSignedInvisitor = '${ServerLink.mainServerURL}/api/visitor/signed_in_visitor'; // post - {token}{"site_id": } for feature 2
+  static const String fetchSignedInvisitor = '${ServerLink.mainServerURL}/api/visitor/site_visitors'; // post - {token}{"site_id": } for feature 2
   static const String fetchUserQrLink = '${ServerLink.mainServerURL}/api/user/sign_in_link'; // post - {token}{"site_id": } for feature 5 - return slug included link
   
   static const String pushDeliveryInLedge = '${ServerLink.mainServerURL}/api/delivery'; // post - {token}{"deliveryCompany":"","notificationSent":"" } for feature 6 
@@ -35,6 +35,13 @@ class ServerLink {
 //--------------------------Sign in Question Format------------------------------------------
 
 /* 
+visitor 
+[{"id":319110,"project_id":1,"name":"Visitor - test 123","email":"test@qq.com","company":"544","phone":"1234145","visitor_id":"VIS69657fde76e08","project_name":"1002567 Thirroul Development - Alternate Loc 1002567 Thirroul Development - Alternate Loc","sign_in":"2026-01-12T23:12:30+00:00","sign_out":""},{"id":319130,"project_id":1,"name":"Visitor - barrys","email":"hshu@qq.com","company":"hssj","phone":"0416166166","visitor_id":"VIS696584f335898","project_name":"1002567 Thirroul Development - Alternate Loc 1002567 Thirroul Development - Alternate Loc","sign_in":"2026-01-12T23:34:11+00:00","sign_out":""},{"id":319237,"project_id":1,"name":"Visitor - test","email":"tsst@qq.com","company":"","phone":"","visitor_id":"VIS6965a32767349","project_name":"1002567 Thirroul Development - Alternate Loc 1002567 Thirroul Development - Alternate Loc","sign_in":"2026-01-13T01:43:03+00:00","sign_out":""},{"id":319239,"project_id":1,"name":"Visitor - wast bar","email":"tesf@qq.com","company":"","phone":"","visitor_id":"VIS696
+
+Client 
+
+Client data: {"logo":"https://storage.worxsafety.com.au/site/public/22080/pblogo.svg","background_image":"https://storage.worxsafety.com.au/site/public/7/60dbb67c245b3_bg-masthead.jpg","slug":"pinkbatteries","name":"HUGH ARTHUR TORNEY","trading_name":"Pink Batteries"}
+
 Logic: if it is default question - return 1. default quest, otherwise, it is the customized question - return 2. customized sign in question
 //-----------------------------
 default questions: 

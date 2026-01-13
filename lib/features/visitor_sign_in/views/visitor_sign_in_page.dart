@@ -65,6 +65,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
 
   // Visitor photo
   Uint8List? _visitorPhotoBytes; // Captured visitor photo
+  String? _visitorPhotoFilename;
   final ImagePicker _imagePicker = ImagePicker();
   bool _isTakingPhoto = false; // Prevent multiple concurrent camera requests
 
@@ -97,7 +98,11 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
     });
 
     // Load data in parallel for faster initialization
-    await Future.wait([_refreshContacts(), _refreshSites()]);
+    // Use eagerError: false to ensure all tasks complete even if one fails
+    await Future.wait(
+      [_refreshContacts(), _refreshSites()],
+      eagerError: false,
+    );
 
     if (mounted) {
       setState(() {
@@ -167,6 +172,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
         if (mounted) {
           setState(() {
             _visitorPhotoBytes = bytes;
+            _visitorPhotoFilename = photo.name;
           });
         }
       }
@@ -194,6 +200,7 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
   void _removePhoto() {
     setState(() {
       _visitorPhotoBytes = null;
+      _visitorPhotoFilename = null;
     });
   }
 
@@ -340,12 +347,12 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
       // Format the "agree" data
       final Map<String, dynamic> agreeData = _formatAgreeData();
 
-      // Prepare photos payload with visitor ID as key
-      Map<String, String>? photosPayload;
       if (_visitorPhotoBytes != null) {
-        photosPayload = {
-          tempVisitorId: base64Encode(_visitorPhotoBytes!),
-        };
+        debugPrint('PHOTO UPLOAD PREP:');
+        debugPrint('  Photo bytes: ${_visitorPhotoBytes!.length}');
+        debugPrint('  Temp Visitor ID: $tempVisitorId');
+      } else {
+        debugPrint('No visitor photo captured - submitting without photo');
       }
 
       final response = await ApiService.submitSignInLedger(
@@ -372,7 +379,8 @@ class _VisitorSignInPageState extends State<VisitorSignInPage> {
             ? _selectedContactDetail!.name
             : null,
         signInTime: c.reqSignInTime ? _signInTimeDisplay : null,
-        visitorPhotos: photosPayload,
+        visitorPhotoBytes: _visitorPhotoBytes,
+        visitorPhotoFilename: _visitorPhotoFilename,
       );
 
       debugPrint('Sign in successfully in site!');

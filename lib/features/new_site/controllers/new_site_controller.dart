@@ -23,10 +23,20 @@ class NewSiteController {
 
     final sitesJson = await SecureStorageService.getSites();
     if (sitesJson != null && sitesJson.isNotEmpty) {
-      final sitesList = jsonDecode(sitesJson) as List<dynamic>;
-      _all = sitesList
-          .map((json) => SiteItem.fromJson(json as Map<String, dynamic>))
-          .toList();
+      try {
+        final decoded = jsonDecode(sitesJson);
+        final rawList = decoded is List
+            ? decoded
+            : (decoded is Map<String, dynamic> && decoded['data'] is List
+                ? decoded['data'] as List<dynamic>
+                : <dynamic>[]);
+        _all = rawList
+            .whereType<Map<String, dynamic>>()
+            .map(SiteItem.fromJson)
+            .toList();
+      } catch (_) {
+        _all = [];
+      }
     }
     _isLoaded = true;
   }

@@ -50,11 +50,15 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
     });
 
     // Load data in parallel for faster initialization
-    await Future.wait([
-      _loadRecentVisitors(),
-      _refreshContacts(),
-      _refreshSites(),
-    ]);
+    // Use eagerError: false to ensure all tasks complete even if one fails
+    await Future.wait(
+      [
+        _loadRecentVisitors(),
+        _refreshContacts(),
+        _refreshSites(),
+      ],
+      eagerError: false,
+    );
 
     if (mounted) {
       setState(() {
@@ -105,41 +109,116 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
   }
 
   Future<void> _loadRecentVisitors() async {
-    final visitors = await SecureStorageService.getSignedVisitors();
-    if (!mounted) return;
-
     final byId = <String, _SignedVisitor>{};
-    for (final visitor in visitors) {
-      final id = visitor['id']?.toString().trim() ?? '';
-      final email = visitor['email']?.toString().trim().toLowerCase() ?? '';
-      final fullName = visitor['full_name']?.toString() ?? '';
-      final supervisorId = visitor['supervisor_id']?.toString().trim() ?? '';
-      final supervisorName =
-          visitor['supervisor_name']?.toString().trim() ?? '';
-      final supervisorEmail =
-          visitor['supervisor_email']?.toString().trim() ?? '';
-      final supervisorPhone =
-          visitor['supervisor_phone']?.toString().trim() ?? '';
-      final notifyViaSms = visitor['notify_via_sms'] == true;
-      final notifyViaEmail = visitor['notify_via_email'] == true;
 
-      final record = _SignedVisitor(
-        id: id,
-        email: email,
-        fullName: fullName,
-        supervisorId: supervisorId,
-        supervisorName: supervisorName,
-        supervisorEmail: supervisorEmail,
-        supervisorPhone: supervisorPhone,
-        notifyViaSms: notifyViaSms,
-        notifyViaEmail: notifyViaEmail,
+    try {
+      // Get auth token and site ID
+      final token = await SecureStorageService.getAuthToken();
+      final controller = DashboardController.instance;
+      final siteId = controller?.currentSite?.id;
+
+      if (token == null || token.isEmpty) {
+        debugPrint('No auth token found');
+        throw Exception('Authentication required');
+      }
+
+      if (siteId == null || siteId.isEmpty) {
+        debugPrint('No site selected');
+        throw Exception('Please select a site');
+      }
+
+      debugPrint('Fetching signed in visitors from API...');
+      debugPrint('Site ID: $siteId');
+
+      // Fetch visitors from API
+      final visitors = await ApiService.fetchSignedInVisitors(
+        token: token,
+        siteId: siteId,
       );
 
-      if (id.isNotEmpty) {
-        byId[id] = record;
+      debugPrint('Received ${visitors.length} visitors from API');
+      debugPrint(jsonEncode(visitors));
+      debugPrint('======================================');
+
+      // Parse visitors into _SignedVisitor objects
+      for (final visitor in visitors) {
+        // IMPORTANT: Use visitor_id (VIS...) NOT database id (319110)
+        // Server expects visitor_id like "VIS69657fde76e08"
+        final id = visitor['visitor_id']?.toString().trim() ??
+                   visitor['unique_id']?.toString().trim() ??
+                   visitor['id']?.toString().trim() ?? '';
+        final email = visitor['email']?.toString().trim().toLowerCase() ?? '';
+        final fullName = visitor['full_name']?.toString() ??
+                        visitor['name']?.toString() ?? '';
+        final supervisorId = visitor['supervisor_id']?.toString().trim() ?? '';
+        final supervisorName = visitor['supervisor']?.toString().trim() ??
+                              visitor['supervisor_name']?.toString().trim() ?? '';
+        final supervisorEmail = visitor['supervisor_email']?.toString().trim() ?? '';
+        final supervisorPhone = visitor['supervisor_phone']?.toString().trim() ?? '';
+        final notifyViaSms = visitor['notify_via_sms'] == true ||
+                            visitor['notify_sms'] == true;
+        final notifyViaEmail = visitor['notify_via_email'] == true ||
+                              visitor['notify_email'] == true;
+
+        if (id.isNotEmpty) {
+          final record = _SignedVisitor(
+            id: id,
+            email: email,
+            fullName: fullName,
+            supervisorId: supervisorId,
+            supervisorName: supervisorName,
+            supervisorEmail: supervisorEmail,
+            supervisorPhone: supervisorPhone,
+            notifyViaSms: notifyViaSms,
+            notifyViaEmail: notifyViaEmail,
+          );
+          byId[id] = record;
+        }
+      }
+
+      debugPrint('✅ Parsed ${byId.length} visitors successfully');
+    } catch (e) {
+      debugPrint('❌ Error loading visitors from API: $e');
+
+      // Fallback: Try to load from local storage
+      debugPrint('📦 Falling back to local storage...');
+      try {
+        final visitors = await SecureStorageService.getSignedVisitors();
+        for (final visitor in visitors) {
+          // Use visitor_id from local storage (should be VIS... format)
+          final id = visitor['visitor_id']?.toString().trim() ??
+                     visitor['id']?.toString().trim() ?? '';
+          final email = visitor['email']?.toString().trim().toLowerCase() ?? '';
+          final fullName = visitor['full_name']?.toString() ?? '';
+          final supervisorId = visitor['supervisor_id']?.toString().trim() ?? '';
+          final supervisorName = visitor['supervisor_name']?.toString().trim() ?? '';
+          final supervisorEmail = visitor['supervisor_email']?.toString().trim() ?? '';
+          final supervisorPhone = visitor['supervisor_phone']?.toString().trim() ?? '';
+          final notifyViaSms = visitor['notify_via_sms'] == true;
+          final notifyViaEmail = visitor['notify_via_email'] == true;
+
+          if (id.isNotEmpty) {
+            final record = _SignedVisitor(
+              id: id,
+              email: email,
+              fullName: fullName,
+              supervisorId: supervisorId,
+              supervisorName: supervisorName,
+              supervisorEmail: supervisorEmail,
+              supervisorPhone: supervisorPhone,
+              notifyViaSms: notifyViaSms,
+              notifyViaEmail: notifyViaEmail,
+            );
+            byId[id] = record;
+          }
+        }
+        debugPrint('✅ Loaded ${byId.length} visitors from local storage');
+      } catch (storageError) {
+        debugPrint('❌ Error loading from storage: $storageError');
       }
     }
 
+    if (!mounted) return;
     setState(() {
       _visitorsById = byId;
     });
@@ -456,10 +535,13 @@ class _VisitorSignOutPage extends State<VisitorSignOutPage> {
 
     if (_visitorsById.isEmpty) {
       debugPrint('No visitors found - showing snackbar');
+      // Clear any existing snackbars first to prevent accumulation
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No signed-in visitors found on this device'),
+          content: Text('No signed-in visitors found. Please try again or check your connection.'),
           backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
         ),
       );
       return;

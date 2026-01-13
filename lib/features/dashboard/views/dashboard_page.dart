@@ -99,11 +99,15 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     // Load all dashboard data
-    await Future.wait([
-      _loadClientData(),
-      _loadVisitorContacts(),
-      _loadAdminPin(),
-    ]);
+    // Use eagerError: false to ensure all tasks complete even if one fails
+    await Future.wait(
+      [
+        _loadClientData(),
+        _loadVisitorContacts(),
+        _loadAdminPin(),
+      ],
+      eagerError: false,
+    );
 
     if (!mounted) return;
 
