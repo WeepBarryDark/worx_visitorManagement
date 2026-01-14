@@ -762,9 +762,30 @@ class PrinterService {
       return null;
     }
 
+      printer.Printer? printerInstance;
       try {
-        final printerInstance = printer.Printer();
+        printerInstance = printer.Printer();
         printer.Printer.setUserPrinterInfo(selectedPrinter!.printerInfo!);
+
+        // Start communication for label detection
+        try {
+          await printerInstance.startCommunication().timeout(
+            const Duration(seconds: 5),
+          );
+        } catch (e) {
+          debugPrint('Start communication failed (detection): $e');
+        }
+
+        // Get currently selected paper type to help with disambiguation
+        PaperType? currentlySelected;
+        final savedPaperTypeMap = await SecureStorageService.getPaperType();
+        if (savedPaperTypeMap != null) {
+          try {
+            currentlySelected = PaperType.fromJson(savedPaperTypeMap);
+          } catch (e) {
+            debugPrint('Could not parse saved paper type: $e');
+          }
+        }
 
         // Prefer label info API (more reliable for loaded media)
         LabelInfo? labelInfo;
@@ -786,18 +807,42 @@ class PrinterService {
           debugPrint('labelNameIndex: $labelNameIndex');
           debugPrint('isSpecialTape: $isSpecialTape');
 
-          final detectedType = PaperType.allPaperTypes.firstWhere(
+          // Find all matching paper types
+          final matchingTypes = PaperType.allPaperTypes.where(
             (type) =>
                 type.labelNameIndex == labelNameIndex &&
                 type.isSpecialTape == isSpecialTape,
-            orElse: () {
-              debugPrint('WARNING: No exact match found, using default type');
-              return PaperType.defaultType;
-            },
-          );
+          ).toList();
+
+          PaperType detectedType;
+          if (matchingTypes.isEmpty) {
+            debugPrint('WARNING: No matching paper types found, using default');
+            detectedType = PaperType.defaultType;
+          } else if (matchingTypes.length == 1) {
+            detectedType = matchingTypes.first;
+          } else {
+            // Multiple matches - prefer currently selected type if it matches
+            if (currentlySelected != null &&
+                matchingTypes.any((t) => t.code == currentlySelected!.code)) {
+              detectedType = currentlySelected;
+              debugPrint('Multiple matches found, using currently selected: ${detectedType.code}');
+            } else {
+              // Otherwise use first match (usually most common type for that size)
+              detectedType = matchingTypes.first;
+              debugPrint('Multiple matches: ${matchingTypes.map((t) => t.code).join(", ")}');
+              debugPrint('Using first match: ${detectedType.code}');
+            }
+          }
 
           debugPrint('Auto-detected paper type: ${detectedType.code}');
           debugPrint('================================');
+
+          // End communication to release resources
+          try {
+            await printerInstance.endCommunication();
+          } catch (e) {
+            debugPrint('Failed to end communication (LabelInfo path): $e');
+          }
 
           if (persist) {
             await SecureStorageService.savePaperType(detectedType.toJson());
@@ -869,15 +914,31 @@ class PrinterService {
 
         debugPrint('Using labelNameIndex: $labelNameIndex (labelId: $labelId)');
 
-      // Find matching paper type
-      final detectedType = PaperType.allPaperTypes.firstWhere(
+      // Find all matching paper types
+      final matchingTypes = PaperType.allPaperTypes.where(
         (type) => type.labelNameIndex == labelNameIndex &&
                   type.isSpecialTape == isSpecialTape,
-        orElse: () {
-          debugPrint('WARNING: No exact match found, using default type');
-          return PaperType.defaultType;
-        },
-      );
+      ).toList();
+
+      PaperType detectedType;
+      if (matchingTypes.isEmpty) {
+        debugPrint('WARNING: No matching paper types found, using default');
+        detectedType = PaperType.defaultType;
+      } else if (matchingTypes.length == 1) {
+        detectedType = matchingTypes.first;
+      } else {
+        // Multiple matches - prefer currently selected type if it matches
+        if (currentlySelected != null &&
+            matchingTypes.any((t) => t.code == currentlySelected!.code)) {
+          detectedType = currentlySelected;
+          debugPrint('Multiple matches found, using currently selected: ${detectedType.code}');
+        } else {
+          // Otherwise use first match (usually most common type for that size)
+          detectedType = matchingTypes.first;
+          debugPrint('Multiple matches: ${matchingTypes.map((t) => t.code).join(", ")}');
+          debugPrint('Using first match: ${detectedType.code}');
+        }
+      }
 
       debugPrint('Auto-detected paper type: ${detectedType.code}');
       debugPrint('================================');
@@ -887,9 +948,26 @@ class PrinterService {
           await SecureStorageService.savePaperType(detectedType.toJson());
         }
 
+        // End communication to release resources
+        try {
+          await printerInstance.endCommunication();
+        } catch (e) {
+          debugPrint('Failed to end communication (detection): $e');
+        }
+
       return detectedType;
     } catch (e) {
       debugPrint('Error detecting paper type: $e');
+
+      // Try to end communication even on error
+      if (printerInstance != null) {
+        try {
+          await printerInstance.endCommunication();
+        } catch (_) {
+          debugPrint('Failed to cleanup connection after error');
+        }
+      }
+
       return null;
     }
   }
@@ -1008,6 +1086,22 @@ class PrinterService {
       final printerInstance = printer.Printer();
       printer.Printer.setUserPrinterInfo(printerInfo);
 
+        // Start communication (important for resource management)
+        bool communicationStarted = false;
+        try {
+          communicationStarted = await printerInstance.startCommunication().timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('Start communication timeout');
+              return false;
+            },
+          );
+          debugPrint('Communication started: $communicationStarted');
+        } catch (e) {
+          debugPrint('Failed to start communication: $e');
+          // Continue anyway - SDK says it's optional on Android
+        }
+
         // Get current printer status before printing
         try {
           final currentStatus = await printerInstance.getPrinterStatus().timeout(
@@ -1032,14 +1126,23 @@ class PrinterService {
           return false;
         }
 
+        // Only check labelNameIndex and isSpecialTape, not exact paper code
+        // Brother printers cannot distinguish between different materials with the same width
+        // (e.g., DK-22205, DK-22113, DK-22212 all use labelNameIndex: 15)
         final matchesLabel = detectedType.labelNameIndex == labelNameIndex;
         final matchesSpecial = detectedType.isSpecialTape == isSpecialTape;
         if (!matchesLabel || !matchesSpecial) {
           errorMessage =
-              'Paper type mismatch: selected ${selectedPaperType?.code ?? labelNameIndex}, detected ${detectedType.code}';
+              'Paper type mismatch: selected ${selectedPaperType?.code ?? labelNameIndex} (index: $labelNameIndex), detected ${detectedType.code} (index: ${detectedType.labelNameIndex})';
           debugPrint(errorMessage);
           onStatusUpdate?.call(PrintProgress.failed(errorMessage!));
           return false;
+        }
+
+        // Log successful match (may be different material with same dimensions)
+        if (detectedType.code != selectedPaperType?.code) {
+          debugPrint('Note: Detected ${detectedType.code} but selected ${selectedPaperType?.code}');
+          debugPrint('This is OK - same labelNameIndex ($labelNameIndex) and tape type');
         }
 
       await Future.delayed(const Duration(milliseconds: 300));
@@ -1057,6 +1160,21 @@ class PrinterService {
 
       debugPrint('Print result errorCode: ${printResult.errorCode.getName()}');
 
+      // End communication to release resources
+      try {
+        final commEnded = await printerInstance.endCommunication().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            debugPrint('End communication timeout');
+            return false;
+          },
+        );
+        debugPrint('Communication ended: $commEnded');
+      } catch (e) {
+        debugPrint('Failed to end communication: $e');
+        // Continue anyway
+      }
+
       if (printResult.errorCode != printer.ErrorCode.ERROR_NONE) {
         errorMessage = 'Print error: ${printResult.errorCode.getName()}';
         debugPrint('===== PRINT FAILED =====');
@@ -1066,6 +1184,7 @@ class PrinterService {
         debugPrint('  2. Wrong color mode (isSpecialTape mismatch)');
         debugPrint('  3. Paper not loaded correctly');
         debugPrint('  4. Paper cover open');
+        debugPrint('  5. Paper roll empty (ERROR_PAPER_EMPTY)');
         debugPrint('=======================');
         onStatusUpdate?.call(PrintProgress.failed(errorMessage!));
         return false;
@@ -1080,6 +1199,15 @@ class PrinterService {
       debugPrint(' Print error: $e');
       errorMessage = 'Print error: $e';
       onStatusUpdate?.call(PrintProgress.failed(errorMessage!));
+
+      // Try to end communication even on error
+      try {
+        final printerInstance = printer.Printer();
+        await printerInstance.endCommunication();
+      } catch (_) {
+        // Ignore cleanup errors
+      }
+
       return false;
     }
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io' show Platform;
 
 /// Kiosk Guard Widget
 /// Keeps the app in immersive mode and blocks accidental exit
